@@ -5,6 +5,7 @@ import { useQuery, useMutation } from '@tanstack/react-query';
 import { getCohort, getJob, retryJob } from '@/lib/api';
 import Link from 'next/link';
 import { useQueryClient } from '@tanstack/react-query';
+import { CohortHeatmap } from '@/components/Heatmap';
 
 const STAGES = ['QUEUED', 'EXTRACTING', 'SEGMENTING', 'RETRIEVING', 'EVALUATING', 'AUDITING', 'SCORING', 'ANNOTATING', 'DONE'];
 
@@ -91,6 +92,8 @@ export default function CohortPage() {
           View Collusion Report
         </Link>
       </div>
+
+      {cohort.jobs && <CohortHeatmap jobs={cohort.jobs} />}
       
       <table className="w-full text-left border-collapse">
         <thead>
