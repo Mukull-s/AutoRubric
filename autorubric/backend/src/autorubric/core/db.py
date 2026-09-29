@@ -4,6 +4,15 @@ from sqlalchemy.dialects.postgresql import JSONB
 from autorubric.contracts import JobStatus
 import datetime
 
+from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession
+from sqlalchemy.orm import declarative_base, sessionmaker
+from autorubric.core.config import config
+
+engine = create_async_engine(config.DATABASE_URL, echo=False)
+AsyncSessionLocal = sessionmaker(
+    engine, class_=AsyncSession, expire_on_commit=False
+)
+
 Base = declarative_base()
 
 class User(Base):
@@ -23,6 +32,7 @@ class Submission(Base):
     id = Column(String, primary_key=True)
     filename = Column(String, nullable=False)
     rubric_id = Column(String, nullable=False)
+    cohort_id = Column(String, nullable=True)
     created_at = Column(DateTime, default=datetime.datetime.utcnow)
 
 class Job(Base):
@@ -67,3 +77,9 @@ class Result(Base):
     total_score = Column(Float, nullable=False)
     needs_review = Column(Boolean, default=False)
     audit_bundle = Column(JSONB, nullable=True)
+
+class CollusionCache(Base):
+    __tablename__ = "collusion_cache"
+    cohort_id = Column(String, primary_key=True)
+    doc_ids_hash = Column(String, nullable=False)
+    report = Column(JSONB, nullable=False)

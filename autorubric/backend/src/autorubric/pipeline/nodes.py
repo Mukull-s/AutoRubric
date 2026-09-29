@@ -19,45 +19,72 @@ def track_stage(stage_name: str, new_status: JobStatus):
             started_at = datetime.datetime.utcnow()
             state["status"] = new_status
             
-            print(json.dumps({
-                "job_id": job_id,
-                "stage": stage_name,
-                "event": "started",
-                "timestamp": started_at.isoformat()
-            }))
+            from autorubric.core.db import AsyncSessionLocal, Job, JobEvent
+            import asyncio
+            
+            async def log_start():
+                async with AsyncSessionLocal() as session:
+                    import uuid
+                    job = await session.get(Job, job_id)
+                    if job:
+                        job.status = new_status
+                    event = JobEvent(id=str(uuid.uuid4()), job_id=job_id, stage=stage_name, started_at=started_at)
+                    session.add(event)
+                    await session.commit()
+            
+            asyncio.run(log_start())
             
             try:
                 new_state = func(state)
                 
-                print(json.dumps({
-                    "job_id": job_id,
-                    "stage": stage_name,
-                    "event": "finished",
-                    "ok": True,
-                    "timestamp": datetime.datetime.utcnow().isoformat()
-                }))
+                async def log_success():
+                    async with AsyncSessionLocal() as session:
+                        from sqlalchemy import select
+                        stmt = select(JobEvent).where(JobEvent.job_id == job_id, JobEvent.stage == stage_name).order_by(JobEvent.started_at.desc())
+                        event = (await session.execute(stmt)).scalars().first()
+                        if event:
+                            event.finished_at = datetime.datetime.utcnow()
+                            event.ok = True
+                        await session.commit()
+                
+                asyncio.run(log_success())
+                
                 return new_state
             except Exception as e:
-                print(json.dumps({
-                    "job_id": job_id,
-                    "stage": stage_name,
-                    "event": "finished",
-                    "ok": False,
-                    "error": str(e),
-                    "timestamp": datetime.datetime.utcnow().isoformat()
-                }))
+                async def log_failure():
+                    async with AsyncSessionLocal() as session:
+                        from sqlalchemy import select
+                        stmt = select(JobEvent).where(JobEvent.job_id == job_id, JobEvent.stage == stage_name).order_by(JobEvent.started_at.desc())
+                        event = (await session.execute(stmt)).scalars().first()
+                        if event:
+                            event.finished_at = datetime.datetime.utcnow()
+                            event.ok = False
+                            event.error = str(e)
+                        await session.commit()
+                        
+                asyncio.run(log_failure())
                 raise
         return wrapper
     return decorator
 
+from autorubric.core.config import config
+
 @track_stage("extract", JobStatus.EXTRACTING)
 def node_extract(state: PipelineState):
-    state["tokens"] = extract(state["pdf_bytes"])
+    if config.STAGE_EXTRACTION_MODE == "mock":
+        from autorubric.extraction import extract
+        state["tokens"] = extract(state["pdf_bytes"])
+    else:
+        raise NotImplementedError("Real extraction module not yet merged")
     return state
 
 @track_stage("segment", JobStatus.SEGMENTING)
 def node_segment(state: PipelineState):
-    propositions = segment(state["tokens"])
+    if config.STAGE_SEGMENTATION_MODE == "mock":
+        from autorubric.nlp import segment
+        propositions = segment(state["tokens"])
+    else:
+        raise NotImplementedError("Real segmentation module not yet merged")
     
     # Task 5 Glue: Set from_hidden_text on propositions
     token_dict = {t.id: t for t in state["tokens"]}
@@ -68,15 +95,39 @@ def node_segment(state: PipelineState):
                 
     state["propositions"] = propositions
     
-    # Task 5 Glue: Store embed_propositions output in job_artifacts (mocked for now)
-    embeddings = embed_propositions(propositions)
-    # in real app: db.session.add(JobArtifact(stage="segment", payload=embeddings))
+    # Store embed_propositions output in job_artifacts
+    if config.STAGE_RETRIEVAL_MODE == "mock":
+        from autorubric.retrieval import embed_propositions
+        embeddings = embed_propositions(propositions)
+    else:
+        raise NotImplementedError("Real retrieval module not yet merged")
+        
+    from autorubric.core.db import AsyncSessionLocal, JobArtifact
+    import asyncio
+    
+    async def save_artifact():
+        async with AsyncSessionLocal() as session:
+            art = JobArtifact(
+                id=f"art-{state.get('doc_id')}-embed",
+                job_id=state.get("doc_id", "unknown"),
+                stage="segment",
+                payload={"embeddings": embeddings}
+            )
+            session.add(art)
+            await session.commit()
+            
+    # Since we are in sync land, run via asyncio
+    asyncio.run(save_artifact())
     
     return state
 
 @track_stage("retrieve", JobStatus.RETRIEVING)
 def node_retrieve(state: PipelineState):
-    state["candidates"] = match(state["propositions"], state["rubric"])
+    if config.STAGE_RETRIEVAL_MODE == "mock":
+        from autorubric.retrieval import match
+        state["candidates"] = match(state["propositions"], state["rubric"])
+    else:
+        raise NotImplementedError("Real retrieval module not yet merged")
     return state
 
 # Task 5 Glue: Build EvalPairs (or marked adapter)
@@ -96,27 +147,40 @@ class EvalPairAdapter:
 
 @track_stage("evaluate", JobStatus.EVALUATING)
 def node_evaluate(state: PipelineState):
-    prop_dict = {p.id: p for p in state["propositions"]}
-    crit_dict = {c.id: c for c in state["rubric"].criteria}
-    
-    eval_pairs = []
-    for cand in state["candidates"]:
-        p_text = prop_dict[cand.prop_id].text if cand.prop_id in prop_dict else ""
-        c_text = crit_dict[cand.criterion_id].description if cand.criterion_id in crit_dict else ""
-        eval_pairs.append(EvalPairAdapter(
-            prop_id=cand.prop_id,
-            criterion_id=cand.criterion_id,
-            proposition_text=p_text,
-            criterion_text=c_text,
-            similarity=cand.similarity
-        ))
+    if config.STAGE_EVALUATION_MODE == "mock":
+        prop_dict = {p.id: p for p in state["propositions"]}
+        crit_dict = {c.id: c for c in state["rubric"].criteria}
         
-    state["classifications"] = classify(eval_pairs)
+        eval_pairs_dict = []
+        for cand in state["candidates"]:
+            p_text = prop_dict[cand.prop_id].text if cand.prop_id in prop_dict else ""
+            c_text = crit_dict[cand.criterion_id].description if cand.criterion_id in crit_dict else ""
+            eval_pairs_dict.append({
+                "prop_id": cand.prop_id,
+                "criterion_id": cand.criterion_id,
+                "similarity": cand.similarity
+            })
+            
+        from autorubric.workers.tasks import evaluate_task
+        from celery.result import allow_join_result
+        from autorubric.contracts import Classification
+        
+        with allow_join_result():
+            result_json = evaluate_task.delay(eval_pairs_dict).get()
+            classifications = [Classification.model_validate(c) for c in result_json]
+            
+        state["classifications"] = classifications
+    else:
+        raise NotImplementedError("Real evaluation module not yet merged")
     return state
 
 @track_stage("audit", JobStatus.AUDITING)
 def node_audit(state: PipelineState):
-    state["verdicts"] = audit(state["classifications"], state["tokens"], state["propositions"])
+    if config.STAGE_AUDIT_MODE == "mock":
+        from autorubric.audit import audit
+        state["verdicts"] = audit(state["classifications"], state["tokens"], state["propositions"])
+    else:
+        raise NotImplementedError("Real audit module not yet merged")
     return state
 
 @track_stage("score", JobStatus.SCORING)
@@ -138,7 +202,23 @@ def node_score(state: PipelineState):
 
 @track_stage("annotate", JobStatus.ANNOTATING)
 def node_annotate(state: PipelineState):
-    state["annotated_pdf"] = annotate(state["pdf_bytes"], state["score"])
+    if config.STAGE_ANNOTATION_MODE == "mock":
+        from autorubric.annotation import annotate
+        pdf_bytes = annotate(state["pdf_bytes"], state["score"])
+    else:
+        raise NotImplementedError("Real annotation module not yet merged")
+        
+    # Save the annotated pdf to the volume
+    import os
+    
+    doc_id = state.get("doc_id", "unknown")
+    os.makedirs(config.UPLOADS_DIR, exist_ok=True)
+    pdf_path = os.path.join(config.UPLOADS_DIR, f"{doc_id}_annotated.pdf")
+    
+    with open(pdf_path, "wb") as f:
+        f.write(pdf_bytes)
+        
+    state["annotated_pdf"] = pdf_path
     if state["status"] != JobStatus.NEEDS_REVIEW:
         state["status"] = JobStatus.DONE
     return state

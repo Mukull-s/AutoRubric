@@ -21,3 +21,6 @@ fmt:
 
 demo:
 	bash scripts/demo.sh
+
+models:
+	bash scripts/download_model.sh

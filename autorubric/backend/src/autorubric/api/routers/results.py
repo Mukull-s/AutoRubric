@@ -10,17 +10,35 @@ router = APIRouter()
 
 @router.get("/{doc_id}")
 async def get_result(doc_id: str, current_user: dict = Depends(get_current_user)):
-    fixture_path = Path(__file__).parents[4] / "tests" / "fixtures" / "scorer" / "score_result.json"
-    with open(fixture_path) as f:
-        data = json.load(f)
-    return ScoreResult.model_validate(data)
+    from autorubric.core.db import AsyncSessionLocal, Result
+    from sqlalchemy import select
+    from autorubric.core.config import config
+    import os
+    
+    async with AsyncSessionLocal() as session:
+        result = await session.execute(select(Result).where(Result.doc_id == doc_id))
+        res = result.scalar_one_or_none()
+        if not res:
+            raise HTTPException(status_code=404, detail="Result not found")
+            
+        data = res.data
+        pdf_path = os.path.join(config.UPLOADS_DIR, f"{doc_id}_annotated.pdf")
+        data["annotated_pdf_available"] = os.path.exists(pdf_path)
+        data["needs_review"] = res.needs_review
+        
+        return data
 
 @router.get("/{doc_id}/pdf")
 async def get_result_pdf(doc_id: str, current_user: dict = Depends(get_current_user)):
-    fixture_path = Path(__file__).parents[4] / "tests" / "fixtures" / "annotation" / "annotated.pdf"
-    with open(fixture_path, "rb") as f:
-        content = f.read()
-    return Response(content=content, media_type="application/pdf")
+    from fastapi.responses import FileResponse
+    from autorubric.core.config import config
+    import os
+    
+    pdf_path = os.path.join(config.UPLOADS_DIR, f"{doc_id}_annotated.pdf")
+    if not os.path.exists(pdf_path):
+        raise HTTPException(status_code=404, detail="PDF not found")
+        
+    return FileResponse(pdf_path, media_type="application/pdf", filename=f"{doc_id}_annotated.pdf")
 
 class VerifyResponse(BaseModel):
     match: bool

@@ -16,7 +16,7 @@ export function MSWProvider({
         process.env.NEXT_PUBLIC_USE_MOCKS === 'true'
       ) {
         const { worker } = await import('../mocks/browser')
-        await worker.start({ onUnhandledRequest: 'bypass' })
+        await worker.start()
       }
       setMockingEnabled(true)
     }

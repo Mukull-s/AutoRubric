@@ -16,4 +16,8 @@ celery_app.conf.update(
     result_serializer="json",
     timezone="UTC",
     enable_utc=True,
+    task_routes={
+        "autorubric.workers.tasks.evaluate_task": {"queue": "gpu_queue"},
+        "autorubric.workers.tasks.*": {"queue": "celery"},
+    }
 )

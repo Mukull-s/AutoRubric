@@ -17,11 +17,14 @@ services:
       - redis
     volumes:
       - ./backend/src:/app/src
+      - ./models:/app/models
+      - uploads:/app/uploads
 
   worker:
     build:
       context: ./backend
       dockerfile: ../deploy/worker.Dockerfile
+    command: celery -A autorubric.workers.celery_app worker -Q celery -l INFO
     environment:
       - DATABASE_URL=postgresql+asyncpg://postgres:postgres@postgres:5432/autorubric
       - REDIS_URL=redis://redis:6379/0
@@ -30,6 +33,24 @@ services:
     volumes:
       - ./backend/src:/app/src
       - ./backend/tests/fixtures:/app/tests/fixtures
+      - ./models:/app/models
+      - uploads:/app/uploads
+
+  gpu_worker:
+    build:
+      context: ./backend
+      dockerfile: ../deploy/worker.Dockerfile
+    command: celery -A autorubric.workers.celery_app worker -Q gpu_queue -c 1 -l INFO
+    environment:
+      - DATABASE_URL=postgresql+asyncpg://postgres:postgres@postgres:5432/autorubric
+      - REDIS_URL=redis://redis:6379/0
+    depends_on:
+      - redis
+    volumes:
+      - ./backend/src:/app/src
+      - ./backend/tests/fixtures:/app/tests/fixtures
+      - ./models:/app/models
+      - uploads:/app/uploads
 
   postgres:
     image: pgvector/pgvector:pg16
@@ -59,3 +80,4 @@ services:
 
 volumes:
   pgdata:
+  uploads:
