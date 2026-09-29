@@ -78,3 +78,22 @@ export async function verifyResult(docId: string): Promise<any> {
   if (!res.ok) throw new Error(await res.text());
   return res.json();
 }
+
+export async function getResultPdf(docId: string): Promise<Blob> {
+  const token = localStorage.getItem('token') || sessionStorage.getItem('token');
+  const res = await fetch(`${API_URL}/results/${docId}/pdf`, {
+    headers: {
+      'Authorization': `Bearer ${token}`
+    }
+  });
+  
+  if (!res.ok) {
+    throw new Error('Failed to fetch PDF');
+  }
+  
+  return res.blob();
+}
+
+export async function getCollusion(cohortId: string): Promise<any> {
+  return apiClient<any>(`/cohort/${cohortId}/collusion`);
+}

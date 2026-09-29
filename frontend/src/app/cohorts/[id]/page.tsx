@@ -85,7 +85,12 @@ export default function CohortPage() {
   return (
     <div className="max-w-5xl mx-auto p-6 bg-white shadow rounded border">
       <Link href="/" className="text-blue-600 hover:underline mb-4 inline-block">&larr; Back to Dashboard</Link>
-      <h1 className="text-2xl font-bold mb-6">Cohort: {cohort.name || id}</h1>
+      <div className="flex justify-between items-center mb-6">
+        <h1 className="text-2xl font-bold">Cohort: {cohort.name || id}</h1>
+        <Link href={`/cohorts/${id}/collusion`} className="bg-purple-100 text-purple-800 px-4 py-2 rounded hover:bg-purple-200">
+          View Collusion Report
+        </Link>
+      </div>
       
       <table className="w-full text-left border-collapse">
         <thead>

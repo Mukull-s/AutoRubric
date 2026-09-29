@@ -2,9 +2,10 @@
 
 import { useParams } from 'next/navigation';
 import { useQuery, useMutation } from '@tanstack/react-query';
-import { getResult, verifyResult } from '@/lib/api';
+import { getResult, verifyResult, getResultPdf } from '@/lib/api';
 import Link from 'next/link';
 import { AlertCircle, CheckCircle2, ShieldAlert } from 'lucide-react';
+import { PdfViewer } from '@/components/PdfViewer';
 
 export default function ResultPage() {
   const params = useParams();
@@ -125,6 +126,32 @@ export default function ResultPage() {
           ))}
         </tbody>
       </table>
+
+      <div className="mt-8">
+        <h2 className="text-2xl font-bold mb-4">Annotated PDF</h2>
+        <PdfViewerWrapper docId={docId} />
+      </div>
     </div>
   );
+}
+
+function PdfViewerWrapper({ docId }: { docId: string }) {
+  const { data: pdfBlob, isLoading, error } = useQuery({
+    queryKey: ['resultPdf', docId],
+    queryFn: () => getResultPdf(docId),
+  });
+
+  if (isLoading) return <div className="p-4 bg-gray-100 rounded">Loading PDF...</div>;
+  if (error || !pdfBlob) return <div className="p-4 bg-gray-100 rounded text-red-500">PDF not available yet or failed to load.</div>;
+
+  const url = URL.createObjectURL(pdfBlob);
+
+  return <PdfViewer url={url} onDownload={() => {
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `result_${docId}.pdf`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+  }} />;
 }
