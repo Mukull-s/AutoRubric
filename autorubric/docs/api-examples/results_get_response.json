@@ -1,0 +1,17 @@
+{
+    "doc_id": "doc123",
+    "rubric_id": "r1",
+    "per_criterion": [
+        {
+            "criterion_id": "c1",
+            "label": "FULL_CREDIT",
+            "credit": 1.0,
+            "marks": 2.0,
+            "evidence_bboxes": [{"x": 10.5, "y": 20.0, "w": 100.0, "h": 12.0, "page": 1}],
+            "trusted": true
+        }
+    ],
+    "total": 2.0,
+    "max_total": 2.0,
+    "needs_review": false
+}

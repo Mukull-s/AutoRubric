@@ -1,0 +1,14 @@
+[
+    {
+        "classification_id": "cl1",
+        "trusted": true,
+        "reason": "OK",
+        "flags": []
+    },
+    {
+        "classification_id": "cl2",
+        "trusted": false,
+        "reason": "Suspicious instruction detected.",
+        "flags": ["hidden_text", "instruction_override"]
+    }
+]

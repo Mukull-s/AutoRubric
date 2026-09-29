@@ -1,0 +1,45 @@
+[project]
+name = "autorubric"
+version = "0.1.0"
+description = "AutoRubric Monorepo"
+authors = [
+    {name = "AutoRubric Team"}
+]
+dependencies = [
+    "fastapi",
+    "uvicorn",
+    "pydantic",
+    "pydantic-settings",
+    "sqlalchemy",
+    "asyncpg",
+    "alembic",
+    "celery",
+    "redis",
+    "langgraph",
+    "langchain-core",
+    "python-multipart",
+    "python-jose[cryptography]",
+    "passlib[bcrypt]",
+]
+requires-python = ">=3.11"
+
+[project.optional-dependencies]
+extraction = ["pymupdf", "paddleocr"]
+nlp = ["spacy", "sentence-transformers", "networkx"]
+ml = ["torch", "transformers", "peft", "bitsandbytes"]
+audit = []
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.pytest.ini_options]
+pythonpath = ["src"]
+asyncio_mode = "auto"
+asyncio_default_fixture_loop_scope = "function"
+
+[tool.ruff]
+line-length = 120
+
+[tool.mypy]
+ignore_missing_imports = true

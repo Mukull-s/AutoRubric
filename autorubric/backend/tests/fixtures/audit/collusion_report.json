@@ -1,0 +1,11 @@
+{
+    "cohort_id": "cohort_01",
+    "doc_pairs": [
+        {
+            "a": "doc123",
+            "b": "doc456",
+            "similarity": 0.99,
+            "matching_props": ["p1", "p2"]
+        }
+    ]
+}

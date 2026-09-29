@@ -1,0 +1,19 @@
+{
+    "id": "r1",
+    "title": "Photosynthesis",
+    "criteria": [
+        {
+            "id": "c1",
+            "description": "Mentions chloroplasts",
+            "weight": 1.0,
+            "depends_on": []
+        }
+    ],
+    "credit_map": {
+        "FULL_CREDIT": 1.0,
+        "PARTIAL_CREDIT": 0.5,
+        "NO_CREDIT": 0.0,
+        "MISCONCEPTION": 0.0
+    },
+    "max_score": 1.0
+}

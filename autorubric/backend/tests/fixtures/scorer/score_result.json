@@ -1,0 +1,33 @@
+{
+    "doc_id": "doc123",
+    "rubric_id": "r1",
+    "per_criterion": [
+        {
+            "criterion_id": "c1",
+            "label": "FULL_CREDIT",
+            "credit": 1.0,
+            "marks": 1.0,
+            "evidence_bboxes": [{"x": 10.0, "y": 20.0, "w": 140.0, "h": 10.0, "page": 1}],
+            "trusted": true
+        },
+        {
+            "criterion_id": "c2",
+            "label": "MISCONCEPTION",
+            "credit": 0.0,
+            "marks": 0.0,
+            "evidence_bboxes": [{"x": 10.0, "y": 30.0, "w": 70.0, "h": 10.0, "page": 1}],
+            "trusted": false
+        },
+        {
+            "criterion_id": "c3",
+            "label": "NO_CREDIT",
+            "credit": 0.0,
+            "marks": 0.0,
+            "evidence_bboxes": [],
+            "trusted": true
+        }
+    ],
+    "total": 1.0,
+    "max_total": 4.0,
+    "needs_review": true
+}

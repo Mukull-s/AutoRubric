@@ -1,0 +1,20 @@
+[
+    {
+        "id": "p1",
+        "doc_id": "doc123",
+        "text": "The plant uses chloroplasts.",
+        "token_ids": ["t1", "t2", "t3", "t4"],
+        "page": 1,
+        "bboxes": [{"x": 10.0, "y": 20.0, "w": 140.0, "h": 10.0, "page": 1}],
+        "from_hidden_text": false
+    },
+    {
+        "id": "p2",
+        "doc_id": "doc123",
+        "text": "The plant uses sunlight.",
+        "token_ids": ["t1", "t2", "t3", "t5", "t6"],
+        "page": 1,
+        "bboxes": [{"x": 10.0, "y": 30.0, "w": 70.0, "h": 10.0, "page": 1}],
+        "from_hidden_text": false
+    }
+]

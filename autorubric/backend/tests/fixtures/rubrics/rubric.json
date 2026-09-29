@@ -1,0 +1,31 @@
+{
+    "id": "r1",
+    "title": "Photosynthesis",
+    "criteria": [
+        {
+            "id": "c1",
+            "description": "Mentions chloroplasts",
+            "weight": 1.0,
+            "depends_on": []
+        },
+        {
+            "id": "c2",
+            "description": "Mentions sunlight",
+            "weight": 1.0,
+            "depends_on": []
+        },
+        {
+            "id": "c3",
+            "description": "Explains energy conversion",
+            "weight": 2.0,
+            "depends_on": ["c1", "c2"]
+        }
+    ],
+    "credit_map": {
+        "FULL_CREDIT": 1.0,
+        "PARTIAL_CREDIT": 0.5,
+        "NO_CREDIT": 0.0,
+        "MISCONCEPTION": 0.0
+    },
+    "max_score": 4.0
+}

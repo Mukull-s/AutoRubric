@@ -1,0 +1,18 @@
+* @P1 @P2 @P3 @P4 @P5
+/backend/src/autorubric/contracts/ @P1 @P2 @P3 @P4 @P5
+/backend/src/autorubric/core/ @P1
+/backend/src/autorubric/api/ @P1
+/backend/src/autorubric/workers/ @P1
+/backend/src/autorubric/pipeline/ @P1
+/backend/src/autorubric/scorer/ @P1
+/backend/src/autorubric/extraction/ @P2
+/backend/src/autorubric/annotation/ @P2
+/backend/src/autorubric/nlp/ @P3
+/backend/src/autorubric/retrieval/ @P3
+/backend/src/autorubric/evaluator/ @P4
+/backend/src/autorubric/audit/ @P5
+/ml/ @P4
+/frontend/ @P5
+/deploy/ @P1
+/docker-compose.yml @P1
+/.github/ @P1
