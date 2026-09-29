@@ -39,3 +39,19 @@ Currently, `score(classifications, rubric, verdicts=None)` has an optional `verd
 ### 5. `annotate()` stub PDF validity
 Currently, the stub for `annotate()` returns a dummy string (`%PDF-1.4 dummy`) which fails valid PDF parsing.
 **Proposal:** Replace the dummy bytes with a valid one-page PDF generated with PyMuPDF to be used as a real fixture.
+
+## P5
+
+### 6. The critic cannot see retrieval similarity
+The planned rule "high confidence but weak retrieval" needs the `Candidate.similarity` values, but `audit()` does not receive candidates. 
+**Proposal:** Propose `audit(classifications, tokens, propositions, candidates: list[Candidate] | None = None)`. The argument is optional so nothing breaks.
+
+### 7. The dashboard cannot show proposition text
+`ScoreResult` and `CollusionReport` carry only ids and bboxes, but a reviewer needs to read the evidence and the shared sentences. 
+**Proposal:** Ask P1 for either `GET /results/{doc_id}/propositions` (id, text, page, bboxes, `from_hidden_text`) or text embedded in the responses.
+
+### 8. Critic verdicts should reach the UI
+**Proposal:** Ask P1 to expose verdicts (flags and reasons) in the result response, per criterion.
+
+### 9. `CollusionReport.matching_props` format
+**Proposal:** Propose each entry is `"<prop_id_in_a>::<prop_id_in_b>"`.

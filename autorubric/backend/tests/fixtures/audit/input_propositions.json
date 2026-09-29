@@ -1,0 +1,40 @@
+[
+    {
+        "id": "p1",
+        "doc_id": "doc1",
+        "text": "Normal text",
+        "token_ids": [
+            "t1"
+        ],
+        "page": 1,
+        "bboxes": [
+            {
+                "x": 0.0,
+                "y": 0.0,
+                "w": 10.0,
+                "h": 10.0,
+                "page": 1
+            }
+        ],
+        "from_hidden_text": false
+    },
+    {
+        "id": "p2",
+        "doc_id": "doc1",
+        "text": "Hidden text",
+        "token_ids": [
+            "t2"
+        ],
+        "page": 1,
+        "bboxes": [
+            {
+                "x": 0.0,
+                "y": 0.0,
+                "w": 10.0,
+                "h": 10.0,
+                "page": 1
+            }
+        ],
+        "from_hidden_text": false
+    }
+]
