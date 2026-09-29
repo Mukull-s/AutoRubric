@@ -24,26 +24,28 @@ export function PdfViewer({ url, onDownload }: { url: string, onDownload: () => 
             disabled={pageNumber <= 1} 
             onClick={() => setPageNumber(p => p - 1)}
             className="px-2 py-1 bg-gray-200 rounded disabled:opacity-50 text-sm"
+            aria-label="Previous Page"
           >
             Prev
           </button>
-          <span className="text-sm py-1">
+          <span className="text-sm py-1" aria-live="polite">
             Page {pageNumber} of {numPages || '--'}
           </span>
           <button 
             disabled={numPages === undefined || pageNumber >= numPages} 
             onClick={() => setPageNumber(p => p + 1)}
             className="px-2 py-1 bg-gray-200 rounded disabled:opacity-50 text-sm"
+            aria-label="Next Page"
           >
             Next
           </button>
         </div>
         <div className="flex gap-2">
-          <button onClick={() => setScale(s => Math.max(0.5, s - 0.25))} className="px-2 py-1 bg-gray-200 rounded text-sm">Zoom Out</button>
-          <span className="text-sm py-1">{Math.round(scale * 100)}%</span>
-          <button onClick={() => setScale(s => Math.min(3, s + 0.25))} className="px-2 py-1 bg-gray-200 rounded text-sm">Zoom In</button>
+          <button onClick={() => setScale(s => Math.max(0.5, s - 0.25))} className="px-2 py-1 bg-gray-200 rounded text-sm" aria-label="Zoom Out">Zoom Out</button>
+          <span className="text-sm py-1" aria-live="polite">{Math.round(scale * 100)}%</span>
+          <button onClick={() => setScale(s => Math.min(3, s + 0.25))} className="px-2 py-1 bg-gray-200 rounded text-sm" aria-label="Zoom In">Zoom In</button>
         </div>
-        <button onClick={onDownload} className="px-3 py-1 bg-blue-600 text-white rounded text-sm">Download</button>
+        <button onClick={onDownload} className="px-3 py-1 bg-blue-600 text-white rounded text-sm" aria-label="Download PDF">Download</button>
       </div>
 
       <div className="overflow-auto border shadow-lg max-h-[800px] max-w-full">
