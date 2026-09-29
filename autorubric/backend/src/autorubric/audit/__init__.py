@@ -8,8 +8,7 @@ from .critic import run_critic
 def audit(classifications: list[Classification], tokens: list[Token], propositions: list[Proposition], candidates: list[Candidate] | None = None) -> list[CriticVerdict]:
     return run_critic(classifications, tokens, propositions, candidates)
 
+from .collusion import detect as _detect
+
 def detect(cohort_embeddings) -> CollusionReport:
-    fixture_path = Path(__file__).parents[3] / "tests" / "fixtures" / "audit" / "collusion_report.json"
-    with open(fixture_path) as f:
-        data = json.load(f)
-    return CollusionReport.model_validate(data)
+    return _detect(cohort_embeddings)
