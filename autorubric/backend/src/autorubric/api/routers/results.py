@@ -1,8 +1,10 @@
 from fastapi import APIRouter, Depends, HTTPException, Response
 from ..deps import get_current_user
-from autorubric.contracts import ScoreResult
+from autorubric.contracts import ScoreResult, Rubric, Classification, CriticVerdict
+from autorubric.scorer import score, SCORER_VERSION
 import json
 from pathlib import Path
+from pydantic import BaseModel
 
 router = APIRouter()
 
@@ -19,3 +21,30 @@ async def get_result_pdf(doc_id: str, current_user: dict = Depends(get_current_u
     with open(fixture_path, "rb") as f:
         content = f.read()
     return Response(content=content, media_type="application/pdf")
+
+class VerifyResponse(BaseModel):
+    match: bool
+    differences: list[str]
+
+@router.post("/{doc_id}/verify", response_model=VerifyResponse)
+async def verify_result(doc_id: str, current_user: dict = Depends(get_current_user)):
+    # Mocking verify logic using fixture data
+    fixture_path = Path(__file__).parents[4] / "tests" / "fixtures" / "scorer" / "score_result.json"
+    with open(fixture_path) as f:
+        data = json.load(f)
+    original_score = ScoreResult.model_validate(data)
+    
+    rubric_fixture = Path(__file__).parents[4] / "tests" / "fixtures" / "rubrics" / "rubric.json"
+    classifications_fixture = Path(__file__).parents[4] / "tests" / "fixtures" / "evaluator" / "classifications.json"
+    verdicts_fixture = Path(__file__).parents[4] / "tests" / "fixtures" / "audit" / "critic_verdicts.json"
+    
+    with open(rubric_fixture) as f: rubric = Rubric.model_validate(json.load(f))
+    with open(classifications_fixture) as f: classifications = [Classification.model_validate(i) for i in json.load(f)]
+    with open(verdicts_fixture) as f: verdicts = [CriticVerdict.model_validate(i) for i in json.load(f)]
+    
+    new_score = score(classifications, rubric, verdicts)
+    new_score.doc_id = doc_id
+    
+    if new_score.model_dump() == original_score.model_dump():
+        return {"match": True, "differences": []}
+    return {"match": False, "differences": ["Mismatched scores"]}

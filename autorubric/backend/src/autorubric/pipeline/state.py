@@ -17,3 +17,4 @@ class PipelineState(TypedDict):
     annotated_pdf: Optional[bytes]
     status: JobStatus
     error: Optional[str]
+    audit_bundle: Optional[dict]

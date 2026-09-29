@@ -7,7 +7,7 @@ from autorubric.contracts import JobStatus, Rubric
 def test_pipeline_end_to_end():
     graph = build_graph()
     
-    fixture_path = Path(__file__).parents[2] / "fixtures" / "rubrics" / "rubric.json"
+    fixture_path = Path(__file__).parents[1] / "fixtures" / "rubrics" / "rubric.json"
     with open(fixture_path) as f:
         rubric = Rubric.model_validate(json.load(f))
         

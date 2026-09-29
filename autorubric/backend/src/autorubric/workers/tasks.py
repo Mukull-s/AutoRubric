@@ -1,11 +1,21 @@
 from .celery_app import celery_app
 from autorubric.pipeline.graph import build_graph
 from autorubric.contracts import JobStatus, Rubric
-import asyncio
-# In a real app we'd fetch the job from the DB here
-# For the stub, we just run the pipeline.
+from autorubric.core.errors import TransientError, PermanentError
+import traceback
 
-@celery_app.task(bind=True, max_retries=3)
+@celery_app.task(
+    bind=True,
+    autoretry_for=(TransientError,),
+    retry_backoff=True,
+    retry_backoff_max=60,
+    retry_jitter=True,
+    max_retries=3,
+    soft_time_limit=300,
+    time_limit=330,
+    acks_late=True,
+    reject_on_worker_lost=True
+)
 def run_pipeline(self, job_id: str, rubric_dict: dict, pdf_bytes_hex: str):
     try:
         graph = build_graph()
@@ -19,12 +29,15 @@ def run_pipeline(self, job_id: str, rubric_dict: dict, pdf_bytes_hex: str):
             "status": JobStatus.QUEUED
         }
         
-        # In a real app we'd stream the state changes to the DB
-        # graph.stream() could be used here
         result = graph.invoke(initial_state)
-        
-        # update DB with result["score"]
-        return {"status": result["status"], "score_total": result["score"].total}
+        return {"status": result["status"]}
+    except TransientError as e:
+        raise
     except Exception as e:
-        # set FAILED in DB
-        raise self.retry(exc=e, countdown=10)
+        # Catch PermanentError or any other Exception
+        error_msg = str(e)
+        tb = traceback.format_exc()
+        # Mocking writing to failed_jobs DB here
+        print(f"FAILED JOB {job_id}: {error_msg}\n{tb}")
+        # In a real app we would set job status to FAILED in DB and insert into failed_jobs
+        return {"status": JobStatus.FAILED, "error": error_msg}

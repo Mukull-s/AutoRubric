@@ -3,7 +3,7 @@ set -e
 
 echo "Logging in..."
 TOKEN=$(curl -s -X POST http://localhost:8000/auth/login \
-  -d "username=admin&password=admin" | jq -r .access_token)
+  -d "username=admin@example.com&password=admin" | jq -r .access_token)
 
 echo "Creating rubric..."
 RUBRIC_ID=$(curl -s -X POST http://localhost:8000/rubrics \
@@ -20,15 +20,21 @@ JOB_ID=$(curl -s -X POST http://localhost:8000/submissions \
 echo "Job ID: $JOB_ID"
 
 echo "Polling job status..."
-for i in {1..10}; do
+for i in {1..30}; do
   STATUS=$(curl -s -X GET http://localhost:8000/jobs/$JOB_ID \
     -H "Authorization: Bearer $TOKEN" | jq -r .status)
   echo "Status: $STATUS"
-  if [ "$STATUS" = "DONE" ]; then
+  if [[ "$STATUS" == "DONE" || "$STATUS" == "FAILED" || "$STATUS" == "NEEDS_REVIEW" ]]; then
     break
   fi
   sleep 2
 done
+
+if [[ "$STATUS" == "FAILED" ]]; then
+  echo "Job failed!"
+  exit 1
+fi
+
 
 echo "Getting result..."
 curl -s -X GET http://localhost:8000/results/$JOB_ID \
