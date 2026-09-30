@@ -47,5 +47,51 @@ def test_redteam_text():
             "pass": expected_flagged == is_flagged
         })
         
+    print("\n--- CRITIC RESULTS ---")
+    tp = sum(1 for r in results if r["expected"] == "flagged" and r["actual"] == "flagged")
+    fp = sum(1 for r in results if r["expected"] == "benign" and r["actual"] == "flagged")
+    tn = sum(1 for r in results if r["expected"] == "benign" and r["actual"] == "benign")
+    fn = sum(1 for r in results if r["expected"] == "flagged" and r["actual"] == "benign")
+    
+    precision = tp / (tp + fp) if (tp + fp) > 0 else 1.0
+    recall = tp / (tp + fn) if (tp + fn) > 0 else 0.0
+    fpr = fp / (fp + tn) if (fp + tn) > 0 else 0.0
+    
+    print(f"TP: {tp}, FP: {fp}, TN: {tn}, FN: {fn}")
+    print(f"Precision: {precision:.2f}")
+    print(f"Recall: {recall:.2f}")
+    print(f"False Positive Rate: {fpr:.2f}")
+    
+    # -----------------------------------------------------
+    # Collusion testing (benign cohort simulation)
+    # -----------------------------------------------------
+    import numpy as np
+    from autorubric.audit.collusion import detect, CollusionConfig
+    
+    def generate_benign_cohort(size, props_per_doc, dim=256, noise_level=0.4):
+        base_answer = np.random.randn(props_per_doc, dim)
+        base_answer /= np.linalg.norm(base_answer, axis=1, keepdims=True)
+        embeddings = {}
+        for d in range(size):
+            doc_props = {}
+            for p in range(props_per_doc):
+                noise = np.random.randn(dim) * noise_level
+                vec = base_answer[p] + noise
+                vec /= np.linalg.norm(vec)
+                doc_props[f"p{p}"] = vec.tolist()
+            embeddings[f"doc_{d}"] = doc_props
+        return embeddings
+
+    config = CollusionConfig(prop_threshold=0.85, pair_absolute_threshold=0.70, z_score_threshold=1.5)
+    
+    c1 = generate_benign_cohort(10, 5, noise_level=0.4)
+    r1 = detect(c1, config)
+    c2 = generate_benign_cohort(10, 5, noise_level=0.4)
+    r2 = detect(c2, config)
+    
+    print("\n--- COLLUSION RESULTS ---")
+    print(f"Benign Cohort 1 false positives: {len(r1.doc_pairs)}")
+    print(f"Benign Cohort 2 false positives: {len(r2.doc_pairs)}")
+    
     for r in results:
         assert r["pass"] is True, f"Failed redteam test on {r['file']}: expected {r['expected']}, got {r['actual']}"

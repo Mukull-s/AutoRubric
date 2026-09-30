@@ -4,9 +4,11 @@
 - **Missing response schemas in OpenAPI:** Endpoints like `GET /results/{doc_id}`, `GET /jobs/{job_id}`, and `GET /cohorts/{id}` return `unknown` in the OpenAPI schema because they lack explicit response models in the FastAPI router decorators. We generated types via `openapi-typescript` but they are mostly `unknown` for GET requests.
 - **Action for P1:** Please add `response_model` definitions to all endpoints in `autorubric/backend/src/autorubric/api/routers/` (especially jobs, submissions, and results) so the frontend can strictly type the responses. Currently using hand-written schemas as a fallback.
 
-## Missing Endpoints
+## API gaps
+- **GET /rubrics**: This endpoint is missing entirely from the backend, but the frontend dashboard requires it to display available rubrics.
 - **GET /results/{doc_id}/propositions**: The critic needs to display proposition text instead of just IDs, but this endpoint is still not available.
-- **Action for P1:** Please implement the proposals in `docs/contract-change-proposals.md` and expose propositions in the results payload.
+- **GET /results/{doc_id}**: The result payload is missing the critic verdicts (flags, reason) per criterion. P5 cannot show evidence text or flags without these.
+- **Action for P1:** Please implement the proposals in `docs/contract-change-proposals.md`, add `GET /rubrics`, and expose propositions and critic verdicts in the results payload.
 
 ## State and Data Flow
 - We use TanStack Query for data fetching and polling (e.g. for job status).
