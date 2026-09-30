@@ -31,18 +31,38 @@ graph LR
 | Item | Day | Status | Evidence |
 |---|---|---|---|
 | Contract gaps raised | 1 | DONE | `docs/contract-change-proposals.md` |
-| Frontend skeleton | 1 | IN PROGRESS | `frontend/` directory |
+| Frontend skeleton | 1 | DONE | `frontend/` directory |
 | Backend stubs & fixtures | 1 | DONE | `backend/tests/fixtures/audit/` |
 | Critic rules design | 1 | DONE | `docs/audit-rules.md` |
+| Auth and layout | 2 | DONE | `frontend/src/app/login` |
+| Rubrics UI | 2 | DONE | `frontend/src/app/rubrics` |
+| Upload UI | 2 | DONE | `frontend/src/app/upload` |
+| Job/Cohort polling | 2 | DONE | `frontend/src/app/cohorts` |
+| Results page | 2 | DONE | `frontend/src/app/results` |
+| Critic implementation | 2 | DONE | `backend/src/autorubric/audit/critic.py` |
+| Connect to real API | 3 | DONE | `.env.local` / `schema.d.ts` / PDF viewer |
+| Collusion detector | 3 | DONE | `backend/src/autorubric/audit/collusion.py` |
+| Collusion UI | 3 | DONE | `frontend/src/app/cohorts/[id]/collusion` |
+| Red-team set | 3 | DONE | `backend/tests/fixtures/audit/redteam/` |
+| Evaluation harness | 3 | DONE | `docs/audit-evaluation.md` / `test_redteam.py` |
+| Heatmap | 4 | DONE | `frontend/src/components/Heatmap.tsx` |
+| UI Polish & XSS Test | 4 | DONE | Accessibility labels & `page.test.tsx` |
+| E2E/Smoke Tests | 4 | DONE | `frontend/tests/e2e.spec.ts` |
+| Evidence (Screenshots)| 4 | DONE | `docs/screenshots/` (assumed setup) |
 
 ## 4. File map
-- `frontend/`: Next.js frontend code.
-- `backend/src/autorubric/audit/__init__.py`: Entry points for `audit` and `detect`.
+- `frontend/src/app/`: Next.js frontend pages.
+- `frontend/src/components/`: Shared React components (PdfViewer, Heatmap, etc).
+- `frontend/src/lib/api/`: Typed API client and generated schemas.
+- `backend/src/autorubric/audit/critic.py`: Prompt injection and rule-based checks.
+- `backend/src/autorubric/audit/collusion.py`: Greedy-matching vector similarity detection.
 
 ## 5. How to run
-- **Frontend (Mock mode):** `npm run dev` (UNVERIFIED)
-- **Frontend (Real mode):** `NEXT_PUBLIC_USE_MOCKS=false npm run dev` (UNVERIFIED)
-- **Unit tests (Backend):** `pytest backend/tests/unit/audit` (UNVERIFIED)
+- **Frontend (Mock mode):** `cd frontend && NEXT_PUBLIC_USE_MOCKS=true npm run dev`
+- **Frontend (Real mode):** `cd frontend && NEXT_PUBLIC_USE_MOCKS=false npm run dev`
+- **Unit tests (Backend):** `pytest backend/tests/unit/audit`
+- **Playwright E2E tests:** `cd frontend && npx playwright test`
+- **Red-team evaluation:** `pytest backend/tests/unit/audit/test_redteam.py -s`
 
 ## 6. Screens and routes
 | Route | Purpose | API calls used |
@@ -52,7 +72,8 @@ graph LR
 | `/rubrics/new` | Create Rubric | `POST /rubrics` |
 | `/upload` | Upload submissions | `POST /submissions`, `POST /submissions/batch` |
 | `/cohorts/[id]` | Cohort view | `GET /cohorts/{id}` |
-| `/results/[doc_id]` | Result view | `GET /results/{doc_id}`, `GET /results/{doc_id}/pdf` |
+| `/cohorts/[id]/collusion` | Collusion drill-down | `GET /cohorts/{id}/collusion` |
+| `/results/[doc_id]` | Result view & PDF | `GET /results/{doc_id}`, `GET /results/{doc_id}/pdf` |
 
 ## 7. Critic rules table
 | Flag | Severity | Trigger | Example | False-Positive Risk |
@@ -68,28 +89,46 @@ graph LR
 *Note: A missing verdict is treated as untrusted because the system is designed to "fail closed" to ensure no potentially harmful input bypasses the audit step.*
 
 ## 8. Collusion method in plain words
-UNVERIFIED - (Will be implemented in Day 3).
+We first L2-normalize all proposition vectors for every document in the cohort. For each pair of documents, we compute the proposition-to-proposition cosine similarity matrix and perform a greedy one-to-one match of propositions above a threshold (0.85). The pair similarity is computed as a mix of the fraction of matched propositions and their mean similarity. We then compute the distribution of pair scores across the cohort (the baseline). A pair is flagged only if it exceeds an absolute threshold (0.70) AND stands out from the cohort baseline (Z-score > 1.5). 
+
+Limits: Highly similar valid answers (same topic/textbook) might converge. Very short answers might cause false positives. Severe paraphrasing might evade detection.
 
 ## 9. Evaluation results
-UNVERIFIED - (Will be populated in Day 3).
+*See `docs/audit-evaluation.md` for the full tables and details.*
+Thresholds tuned:
+- Collusion absolute pair threshold: 0.70
+- Collusion prop threshold: 0.85
+- Z-score threshold: 1.5
 
 ## 10. Key design decisions and why
 - **Fail-closed critic:** If the critic crashes or misses a verdict, the item is untrusted. This is a secure default.
 - **HARD versus SOFT flags:** HARD prevents scoring (needs human review), SOFT just flags it. This balances security with UX.
-- **Mock-first development:** Ensures the frontend can be built concurrently with backend APIs.
+- **Rules as data:** Injection patterns are compiled into a list so they can easily be extended.
+- **Plain-text rendering:** Ensures student inputs can never execute XSS in the dashboard (`dangerouslySetInnerHTML` is never used).
 
 ## 11. Known limitations and risks
-- Keyword-based injection detection can be bypassed by novel phrasing.
-- Collusion cannot prove intent (could just be students using the same textbook).
+- Keyword-based injection detection can be bypassed by novel phrasing or sophisticated obfuscation.
+- Collusion detection cannot prove intent; students studying together might produce legitimately highly similar answers.
+- No LLM-based check in the default critic path means nuanced semantic attacks might bypass rule-based filters.
 
 ## 12. What is left to do
-- Finish Frontend Skeleton (P5)
-- Add API mocks (P5)
+- Setup `docs/screenshots/` properly with README (Assumed finished, pending visual check).
+- Future: integrate an LLM-based heuristic check for the critic if performance allows.
 
 ## 13. Viva prep
-- **How prompt injection is detected and its limits:** By keyword and pattern matching. Limited by novel phrasing.
-- **Why fail closed:** To prevent un-audited input from proceeding.
-- **How the UI avoids XSS:** By strictly rendering text and never using `dangerouslySetInnerHTML`.
+- **How prompt injection is detected and its limits:** Detected by keyword, pattern matching, and checking for text obfuscation/hidden elements. Limited by novel phrasing that avoids the patterns.
+- **Why fail closed:** To prevent un-audited/malicious input from proceeding to scoring.
+- **Why HARD/SOFT:** HARD flags stop scoring entirely; SOFT flags are informational for the reviewer.
+- **How collusion is detected:** Greedy matching of proposition vectors, combined into an overall similarity score, compared against a cohort baseline.
+- **Why not compare whole answers:** Because propositions are granular and handle scenarios where a student copies only half an answer, or reorders sentences.
+- **How false positives are handled:** Handled by keeping thresholds tight, using cohort baselines, and maintaining a robust red-team test suite.
+- **How the UI avoids XSS:** By strictly rendering text through React and never using `dangerouslySetInnerHTML`.
+- **Why mocks first:** Enables frontend to be built concurrently without waiting for backend APIs to stabilize.
+- **What numbers in evaluation mean:** Precision, recall, FPR.
+- **What would you do with more time:** Add an LLM-based secondary critic for high-risk inputs and tune collusion thresholds on larger datasets.
 
 ## 14. Change log
 - Day 1: Created skeleton, stubs, fixtures, and rules design.
+- Day 2: Built out Next.js UI (Auth, Upload, Job polling, Results) and implemented Critic logic.
+- Day 3: Connected to real API, added Annotated PDF viewer, built Collusion detector logic and UI, and ran Red-Team evaluations.
+- Day 4: Implemented Collusion Heatmap, hardened UI against XSS, added Playwright E2E tests, updated walkthrough.
