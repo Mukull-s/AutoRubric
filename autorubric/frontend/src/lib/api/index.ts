@@ -95,5 +95,5 @@ export async function getResultPdf(docId: string): Promise<Blob> {
 }
 
 export async function getCollusion(cohortId: string): Promise<any> {
-  return apiClient<any>(`/cohort/${cohortId}/collusion`);
+  return apiClient<any>(`/cohorts/${cohortId}/collusion`);
 }
