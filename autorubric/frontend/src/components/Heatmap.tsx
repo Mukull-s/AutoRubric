@@ -2,23 +2,26 @@
 
 import { useMemo, useState } from 'react';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import { useQuery } from '@tanstack/react-query';
 import { getCollusion } from '@/lib/api';
+import { Job } from '@/lib/api/schemas';
 
-export function CohortHeatmap({ jobs }: { jobs: any[] }) {
+export function CohortHeatmap({ jobs }: { jobs: Job[] }) {
+  const router = useRouter();
   const [hoveredCell, setHoveredCell] = useState<string | null>(null);
 
   const doneJobs = jobs.filter(j => j.status === 'DONE' && j.doc_id);
-  const docIds = doneJobs.map(j => j.doc_id);
-  const cohortId = jobs.length > 0 ? jobs[0].cohort_id : null;
+  const docIds = doneJobs.map(j => j.doc_id!);
+  const cohortId = jobs.length > 0 ? (jobs[0] as unknown as { cohort_id: string }).cohort_id : null;
 
   const { data: report } = useQuery({
     queryKey: ['collusion', cohortId],
     queryFn: () => getCollusion(cohortId!),
     enabled: !!cohortId,
-  });
+  }) as { data: { doc_pairs?: { a: string, b: string, similarity: number }[] } | undefined };
 
-  const { matrix, maxSim } = useMemo(() => {
+  const { matrix } = useMemo(() => {
     const mat: Record<string, Record<string, number>> = {};
     let max = 0;
     for (const d of docIds) {
@@ -64,7 +67,7 @@ export function CohortHeatmap({ jobs }: { jobs: any[] }) {
             </div>
             {docIds.map(colDoc => {
               const sim = matrix[rowDoc][colDoc];
-              const isFlagged = report?.doc_pairs?.some((p: any) => (p.a === rowDoc && p.b === colDoc) || (p.b === rowDoc && p.a === colDoc));
+              const isFlagged = report?.doc_pairs?.some((p: { a: string, b: string }) => (p.a === rowDoc && p.b === colDoc) || (p.b === rowDoc && p.a === colDoc));
               const percentage = Math.round(sim * 100);
               
               // Color scale: white (0%) to red (100%)
@@ -89,9 +92,9 @@ export function CohortHeatmap({ jobs }: { jobs: any[] }) {
 
               if (isFlagged && rowDoc !== colDoc) {
                 return (
-                  <Link key={colDoc} href="#pair-details" onClick={() => {
-                     // In a real app we'd scroll to the pair drilldown, or link to the page
-                     window.location.href = `/cohorts/${jobs[0].cohort_id || 'unknown'}/collusion`;
+                  <Link key={colDoc} href="#pair-details" onClick={(e) => {
+                     e.preventDefault();
+                     router.push(`/cohorts/${cohortId || 'unknown'}/collusion`);
                   }}>
                     {content}
                   </Link>

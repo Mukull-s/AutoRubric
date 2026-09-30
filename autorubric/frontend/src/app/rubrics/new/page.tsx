@@ -18,7 +18,7 @@ export default function NewRubricPage() {
     onSuccess: () => {
       router.push('/');
     },
-    onError: (err: any) => {
+    onError: (err: Error) => {
       setError(err.message || 'Failed to create rubric');
     }
   });
@@ -96,7 +96,7 @@ export default function NewRubricPage() {
     setCriteria(newC);
   };
 
-  const updateCriterion = (index: number, field: keyof Criterion, value: any) => {
+  const updateCriterion = (index: number, field: keyof Criterion, value: Criterion[keyof Criterion]) => {
     const newC = [...criteria];
     newC[index] = { ...newC[index], [field]: value };
     setCriteria(newC);

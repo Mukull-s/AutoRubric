@@ -21,13 +21,13 @@ export default function UploadPage() {
   const singleMutation = useMutation({
     mutationFn: submitSingle,
     onSuccess: (data) => router.push(`/jobs/${data.job_id}`),
-    onError: (err: any) => setError(err.message || 'Failed to submit')
+    onError: (err: Error) => setError(err.message || 'Failed to submit')
   });
 
   const batchMutation = useMutation({
     mutationFn: submitBatch,
     onSuccess: (data) => router.push(`/cohorts/${data.cohort_id}`),
-    onError: (err: any) => setError(err.message || 'Failed to submit batch')
+    onError: (err: Error) => setError(err.message || 'Failed to submit batch')
   });
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -129,7 +129,7 @@ export default function UploadPage() {
               Array.from(e.dataTransfer.files).forEach(f => dt.items.add(f));
               if (fileInputRef.current) {
                 fileInputRef.current.files = dt.files;
-                handleFileChange({ target: { files: dt.files } } as any);
+                handleFileChange({ target: { files: dt.files } } as unknown as React.ChangeEvent<HTMLInputElement>);
               }
             }}
           >

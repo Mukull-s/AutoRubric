@@ -11,17 +11,17 @@ export default function ResultPage() {
   const params = useParams();
   const docId = params.doc_id as string;
 
-  const { data: result, isLoading, error, refetch } = useQuery({
+  const { data: result, isLoading, error } = useQuery({
     queryKey: ['result', docId],
-    queryFn: () => getResult(docId),
+    queryFn: () => getResult(docId) as Promise<{ rubric_id: string, total: number, max_total: number, needs_review: boolean, review_reasons?: string[], per_criterion?: { criterion_id: string, label: string, marks: number, credit: number, capped?: boolean, trusted: boolean, flags: { code: string, reason: string }[], evidence_bboxes: { page: number, x: number, y: number }[] }[] }>,
   });
 
   const verifyMutation = useMutation({
-    mutationFn: () => verifyResult(docId)
+    mutationFn: () => verifyResult(docId) as Promise<{ match: boolean, differences?: unknown }>
   });
 
   if (isLoading) return <div className="p-6">Loading result...</div>;
-  if (error) return <div className="p-6 text-red-500">Failed to load result</div>;
+  if (error || !result) return <div className="p-6 text-red-500">Failed to load result</div>;
 
   return (
     <div className="max-w-6xl mx-auto p-6 bg-white shadow rounded border">
@@ -79,7 +79,7 @@ export default function ResultPage() {
           </tr>
         </thead>
         <tbody>
-          {result.per_criterion?.map((c: any) => (
+          {result.per_criterion?.map((c: { criterion_id: string, label: string, marks: number, credit: number, capped?: boolean, trusted: boolean, flags: { code: string, reason: string }[], evidence_bboxes: { page: number, x: number, y: number }[] }) => (
             <tr key={c.criterion_id} className={`border-b ${!c.trusted ? 'bg-red-50' : ''}`}>
               <td className="p-3 font-medium">{c.criterion_id}</td>
               <td className="p-3">
@@ -104,7 +104,7 @@ export default function ResultPage() {
                 )}
                 {c.flags && c.flags.length > 0 && (
                   <div className="mt-1 flex flex-col gap-1">
-                    {c.flags.map((f: any, i: number) => (
+                    {c.flags.map((f: { code: string, reason: string }, i: number) => (
                       <span key={i} className="text-[10px] bg-red-100 text-red-800 px-1 py-0.5 rounded" title={f.reason}>
                         {f.code}
                       </span>
@@ -115,7 +115,7 @@ export default function ResultPage() {
               <td className="p-3 text-sm text-gray-600">
                 {/* Fallback to boxes since proposition text is a future contract */}
                 {c.evidence_bboxes?.length > 0 ? (
-                  c.evidence_bboxes.map((box: any, i: number) => (
+                  c.evidence_bboxes.map((box: { page: number, x: number, y: number }, i: number) => (
                     <div key={i}>Page {box.page} (x:{box.x}, y:{box.y})</div>
                   ))
                 ) : (

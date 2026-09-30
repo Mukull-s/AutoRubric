@@ -34,6 +34,6 @@ export const JobSchema = z.object({
   doc_id: z.string().optional(),
   created_at: z.string(),
   updated_at: z.string(),
-  events: z.array(z.any()),
+  events: z.array(z.unknown()),
 });
 export type Job = z.infer<typeof JobSchema>;

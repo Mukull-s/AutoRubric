@@ -1,4 +1,4 @@
-import { test, expect } from '@playwright/test';
+import { test } from '@playwright/test';
 
 test('capture screenshots', async ({ page }) => {
   // Start mock server in dev mode if NEXT_PUBLIC_USE_MOCKS is true

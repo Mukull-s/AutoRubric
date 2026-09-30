@@ -6,12 +6,13 @@ import { getCohort, getJob, retryJob } from '@/lib/api';
 import Link from 'next/link';
 import { useQueryClient } from '@tanstack/react-query';
 import { CohortHeatmap } from '@/components/Heatmap';
+import { Job } from '@/lib/api/schemas';
 
 const STAGES = ['QUEUED', 'EXTRACTING', 'SEGMENTING', 'RETRIEVING', 'EVALUATING', 'AUDITING', 'SCORING', 'ANNOTATING', 'DONE'];
 
-function JobRow({ jobInitial }: { jobInitial: any }) {
+function JobRow({ jobInitial }: { jobInitial: Job & { file_name?: string } }) {
   const queryClient = useQueryClient();
-  const { data: job, error } = useQuery({
+  const { data: job } = useQuery({
     queryKey: ['job', jobInitial.job_id],
     queryFn: () => getJob(jobInitial.job_id),
     initialData: jobInitial,
@@ -78,10 +79,10 @@ export default function CohortPage() {
   const { data: cohort, isLoading, error } = useQuery({
     queryKey: ['cohort', id],
     queryFn: () => getCohort(id),
-  });
+  }) as { data: { name?: string, jobs: (Job & { file_name?: string })[] } | undefined, isLoading: boolean, error: unknown };
 
   if (isLoading) return <div className="p-6">Loading cohort...</div>;
-  if (error) return <div className="p-6 text-red-500">Failed to load cohort</div>;
+  if (error || !cohort) return <div className="p-6 text-red-500">Failed to load cohort</div>;
 
   return (
     <div className="max-w-5xl mx-auto p-6 bg-white shadow rounded border">
@@ -105,7 +106,7 @@ export default function CohortPage() {
           </tr>
         </thead>
         <tbody>
-          {cohort.jobs?.map((job: any) => (
+          {cohort.jobs?.map((job: Job & { file_name?: string }) => (
             <JobRow key={job.job_id} jobInitial={job} />
           ))}
         </tbody>

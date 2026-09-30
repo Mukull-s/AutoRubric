@@ -14,10 +14,11 @@ export function useAuth() {
     if (!memoryToken) {
       memoryToken = sessionStorage.getItem('token');
     }
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setToken(memoryToken);
   }, []);
 
-  const doLogin = async (data: any) => {
+  const doLogin = async (data: Record<string, unknown>) => {
     try {
       const res = await login(data);
       memoryToken = res.access_token;

@@ -12,10 +12,10 @@ export default function CollusionPage() {
   const { data: report, isLoading, error } = useQuery({
     queryKey: ['collusion', cohortId],
     queryFn: () => getCollusion(cohortId),
-  });
+  }) as { data: { doc_pairs?: { a: string, b: string, similarity: number, matching_props?: string[] }[] } | undefined, isLoading: boolean, error: unknown };
 
   if (isLoading) return <div className="p-6">Loading collusion report...</div>;
-  if (error) return <div className="p-6 text-red-500">Failed to load collusion report</div>;
+  if (error || !report) return <div className="p-6 text-red-500">Failed to load collusion report</div>;
 
   const docPairs = report?.doc_pairs || [];
 
@@ -36,7 +36,7 @@ export default function CollusionPage() {
             Found {docPairs.length} suspicious pair{docPairs.length > 1 ? 's' : ''}.
           </div>
           
-          {docPairs.map((pair: any, index: number) => (
+          {docPairs.map((pair: { a: string, b: string, similarity: number, matching_props?: string[] }, index: number) => (
             <div key={index} className="border rounded overflow-hidden">
               <div className="bg-gray-100 p-4 border-b flex justify-between items-center">
                 <div>

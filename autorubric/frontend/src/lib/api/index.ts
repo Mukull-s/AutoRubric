@@ -1,9 +1,9 @@
 import { apiClient } from "./client";
-import { LoginResponse, Rubric, Job } from "./schemas";
+import { LoginResponse, Rubric, Job, CreateRubricRequest } from "./schemas";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
 
-export async function login(data: any): Promise<LoginResponse> {
+export async function login(data: Record<string, unknown>): Promise<LoginResponse> {
   return apiClient<LoginResponse>("/auth/login", {
     method: "POST",
     body: JSON.stringify(data),
@@ -18,7 +18,7 @@ export async function getRubric(id: string): Promise<Rubric> {
   return apiClient<Rubric>(`/rubrics/${id}`);
 }
 
-export async function createRubric(data: any): Promise<Rubric> {
+export async function createRubric(data: CreateRubricRequest): Promise<Rubric> {
   return apiClient<Rubric>("/rubrics", {
     method: "POST",
     body: JSON.stringify(data),
@@ -51,11 +51,11 @@ export async function submitBatch(formData: FormData): Promise<{ cohort_id: stri
   return res.json();
 }
 
-export async function getCohort(id: string): Promise<any> {
-  return apiClient<any>(`/cohorts/${id}`);
+export async function getCohort(id: string): Promise<unknown> {
+  return apiClient<unknown>(`/cohorts/${id}`);
 }
 
-export async function retryJob(jobId: string): Promise<any> {
+export async function retryJob(jobId: string): Promise<unknown> {
   const token = localStorage.getItem('token') || sessionStorage.getItem('token');
   const res = await fetch(`${API_URL}/jobs/${jobId}/retry`, {
     method: 'POST',
@@ -65,11 +65,11 @@ export async function retryJob(jobId: string): Promise<any> {
   return res.json();
 }
 
-export async function getResult(docId: string): Promise<any> {
-  return apiClient<any>(`/results/${docId}`);
+export async function getResult(docId: string): Promise<unknown> {
+  return apiClient<unknown>(`/results/${docId}`);
 }
 
-export async function verifyResult(docId: string): Promise<any> {
+export async function verifyResult(docId: string): Promise<unknown> {
   const token = localStorage.getItem('token') || sessionStorage.getItem('token');
   const res = await fetch(`${API_URL}/results/${docId}/verify`, {
     method: 'POST',
@@ -94,6 +94,6 @@ export async function getResultPdf(docId: string): Promise<Blob> {
   return res.blob();
 }
 
-export async function getCollusion(cohortId: string): Promise<any> {
-  return apiClient<any>(`/cohorts/${cohortId}/collusion`);
+export async function getCollusion(cohortId: string): Promise<unknown> {
+  return apiClient<unknown>(`/cohorts/${cohortId}/collusion`);
 }

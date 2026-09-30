@@ -2,9 +2,9 @@ export const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000
 
 export class ApiError extends Error {
   public status: number;
-  public details: any;
+  public details: unknown;
 
-  constructor(message: string, status: number, details?: any) {
+  constructor(message: string, status: number, details?: unknown) {
     super(message);
     this.status = status;
     this.details = details;

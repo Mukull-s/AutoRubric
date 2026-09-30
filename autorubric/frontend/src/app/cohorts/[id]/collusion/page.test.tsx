@@ -16,7 +16,7 @@ vi.mock('@tanstack/react-query', () => ({
 describe('CollusionPage XSS Test', () => {
   it('renders malicious proposition text as literal string, not HTML', () => {
     // Provide a mocked report with malicious text
-    (useQuery as any).mockReturnValue({
+    (useQuery as unknown as { mockReturnValue: (v: unknown) => void }).mockReturnValue({
       data: {
         cohort_id: 'c1',
         doc_pairs: [

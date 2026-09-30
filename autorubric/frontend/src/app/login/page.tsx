@@ -13,8 +13,8 @@ export default function LoginPage() {
     e.preventDefault();
     try {
       await doLogin({ username, password });
-    } catch (err: any) {
-      setError(err.message || 'Login failed');
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : 'Login failed');
     }
   };
 

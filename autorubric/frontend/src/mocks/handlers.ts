@@ -18,13 +18,13 @@ export const handlers = [
   }),
 
   http.post(`${API_URL}/rubrics`, async ({ request }) => {
-    const data = await request.json() as any;
+    const data = await request.json() as { title: string, criteria: { weight: number }[] };
     return HttpResponse.json({
       id: "r" + Math.floor(Math.random() * 1000),
       title: data.title,
       criteria: data.criteria,
       credit_map: { FULL_CREDIT: 1.0, PARTIAL_CREDIT: 0.5, NO_CREDIT: 0.0, MISCONCEPTION: 0.0 },
-      max_score: data.criteria.reduce((sum: number, c: any) => sum + c.weight, 0)
+      max_score: data.criteria.reduce((sum: number, c: { weight: number }) => sum + c.weight, 0)
     });
   }),
 
@@ -62,7 +62,7 @@ export const handlers = [
     const timeSinceStart = Date.now() % 30000; // loop every 30s for demo
     const statusIndex = Math.min(Math.floor(timeSinceStart / 5000), statuses.length - 1);
     
-    let status = statuses[statusIndex];
+    const status = statuses[statusIndex];
     let doc_id = undefined;
     if (status === 'DONE') doc_id = "doc-" + params.id;
     
