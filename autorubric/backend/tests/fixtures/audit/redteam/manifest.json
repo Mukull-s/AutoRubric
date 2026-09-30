@@ -1,0 +1,57 @@
+[
+  {
+    "file": "hidden_text.pdf",
+    "category": "injection",
+    "expected": "flagged"
+  },
+  {
+    "file": "tiny_font_final.pdf",
+    "category": "injection",
+    "expected": "flagged"
+  },
+  {
+    "file": "visible_note.pdf",
+    "category": "injection",
+    "expected": "flagged"
+  },
+  {
+    "file": "obfuscation.pdf",
+    "category": "injection",
+    "expected": "flagged"
+  },
+  {
+    "file": "label_name.pdf",
+    "category": "injection",
+    "expected": "flagged"
+  },
+  {
+    "file": "benign_1.pdf",
+    "category": "benign",
+    "expected": "benign"
+  },
+  {
+    "file": "benign_2.pdf",
+    "category": "benign",
+    "expected": "benign"
+  },
+  {
+    "file": "collusion_1_a.pdf",
+    "category": "collusion",
+    "expected": "flagged"
+  },
+  {
+    "file": "collusion_1_b.pdf",
+    "category": "collusion",
+    "expected": "flagged"
+  },
+  {
+    "file": "collusion_2_a.pdf",
+    "category": "collusion",
+    "expected": "flagged"
+  },
+  {
+    "file": "collusion_2_b.pdf",
+    "category": "collusion",
+    "expected": "flagged"
+  }
+]

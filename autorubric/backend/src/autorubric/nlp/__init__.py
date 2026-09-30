@@ -11,3 +11,11 @@ def segment(tokens: list[Token]) -> list[Proposition]:
     with open(fixture_path) as f:
         data = json.load(f)
     return [Proposition.model_validate(item) for item in data]
+
+def detect(docs: list[dict]) -> "CollusionReport":
+    from autorubric.contracts import CollusionReport
+    return CollusionReport(
+        cohort_id="unknown",
+        pairs=[],
+        cluster_labels={}
+    )

@@ -13,5 +13,11 @@ async def get_job_status(job_id: str, current_user: dict = Depends(get_current_u
         "status": JobStatus.DONE,
         "error": None,
         "created_at": datetime.utcnow().isoformat(),
-        "updated_at": datetime.utcnow().isoformat()
+        "updated_at": datetime.utcnow().isoformat(),
+        "events": []
     }
+
+@router.post("/{job_id}/retry")
+async def retry_job(job_id: str, current_user: dict = Depends(get_current_user)):
+    # Mocking retry logic
+    return {"message": "Job requeued", "job_id": job_id}

@@ -39,7 +39,7 @@ jobs:
       - name: Install dependencies
         run: |
           cd backend
-          pip install hatchling
+          pip install hatchling pytest-cov
           pip install .[extraction,nlp,ml,audit]
           pip install pytest httpx pytest-asyncio
       - name: Run Ruff (lint)
@@ -48,8 +48,8 @@ jobs:
         run: cd backend && ruff format --check src tests
       - name: Run mypy
         run: cd backend && mypy src
-      - name: Run pytest
+      - name: Run pytest with coverage
         env:
           DATABASE_URL: postgresql+asyncpg://postgres:postgres@localhost:5432/autorubric
           REDIS_URL: redis://localhost:6379/0
-        run: cd backend && pytest
+        run: cd backend && pytest --cov=autorubric.scorer --cov=autorubric.core --cov-fail-under=85

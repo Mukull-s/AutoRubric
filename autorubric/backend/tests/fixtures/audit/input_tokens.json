@@ -1,0 +1,30 @@
+[
+    {
+        "id": "t1",
+        "text": "Normal",
+        "page": 1,
+        "bbox": {
+            "x": 0.0,
+            "y": 0.0,
+            "w": 10.0,
+            "h": 10.0,
+            "page": 1
+        },
+        "block_id": "b1",
+        "is_hidden": false
+    },
+    {
+        "id": "t2",
+        "text": "Hidden",
+        "page": 1,
+        "bbox": {
+            "x": 0.0,
+            "y": 0.0,
+            "w": 10.0,
+            "h": 10.0,
+            "page": 1
+        },
+        "block_id": "b1",
+        "is_hidden": true
+    }
+]

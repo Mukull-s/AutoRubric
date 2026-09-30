@@ -1,11 +1,21 @@
 from .celery_app import celery_app
 from autorubric.pipeline.graph import build_graph
 from autorubric.contracts import JobStatus, Rubric
-import asyncio
-# In a real app we'd fetch the job from the DB here
-# For the stub, we just run the pipeline.
+from autorubric.core.errors import TransientError, PermanentError
+import traceback
 
-@celery_app.task(bind=True, max_retries=3)
+@celery_app.task(
+    bind=True,
+    autoretry_for=(TransientError,),
+    retry_backoff=True,
+    retry_backoff_max=60,
+    retry_jitter=True,
+    max_retries=3,
+    soft_time_limit=300,
+    time_limit=330,
+    acks_late=True,
+    reject_on_worker_lost=True
+)
 def run_pipeline(self, job_id: str, rubric_dict: dict, pdf_bytes_hex: str):
     try:
         graph = build_graph()
@@ -19,12 +29,61 @@ def run_pipeline(self, job_id: str, rubric_dict: dict, pdf_bytes_hex: str):
             "status": JobStatus.QUEUED
         }
         
-        # In a real app we'd stream the state changes to the DB
-        # graph.stream() could be used here
         result = graph.invoke(initial_state)
         
-        # update DB with result["score"]
-        return {"status": result["status"], "score_total": result["score"].total}
+        import asyncio
+        from autorubric.core.db import AsyncSessionLocal, Result as DBResult, Job
+        
+        async def save_final():
+            async with AsyncSessionLocal() as session:
+                score_res = result.get("score")
+                if score_res:
+                    res = DBResult(
+                        doc_id=job_id,
+                        rubric_id=rubric.id if hasattr(rubric, "id") else "unknown",
+                        data=score_res.model_dump(),
+                        total_score=score_res.total_score,
+                        needs_review=score_res.needs_review,
+                        audit_bundle=result.get("audit_bundle")
+                    )
+                    session.add(res)
+                job = await session.get(Job, job_id)
+                if job:
+                    job.status = result["status"]
+                await session.commit()
+                
+        asyncio.run(save_final())
+        
+        return {"status": result["status"]}
+    except TransientError as e:
+        raise
     except Exception as e:
-        # set FAILED in DB
-        raise self.retry(exc=e, countdown=10)
+        error_msg = str(e)
+        tb = traceback.format_exc()
+        print(f"FAILED JOB {job_id}: {error_msg}\n{tb}")
+        
+        import asyncio
+        from autorubric.core.db import AsyncSessionLocal, Job, FailedJob
+        import uuid
+        
+        async def save_failure():
+            async with AsyncSessionLocal() as session:
+                job = await session.get(Job, job_id)
+                if job:
+                    job.status = JobStatus.FAILED
+                    job.error = error_msg
+                failed = FailedJob(id=str(uuid.uuid4()), job_id=job_id, error=error_msg, traceback=tb)
+                session.add(failed)
+                await session.commit()
+                
+        asyncio.run(save_failure())
+        return {"status": JobStatus.FAILED, "error": error_msg}
+
+@celery_app.task(bind=True, queue="gpu_queue")
+def evaluate_task(self, candidates_json: list[dict]):
+    from autorubric.evaluator import classify
+    from autorubric.contracts import Candidate
+    candidates = [Candidate.model_validate(c) for c in candidates_json]
+    classifications = classify(candidates)
+    return [c.model_dump() for c in classifications]
+
