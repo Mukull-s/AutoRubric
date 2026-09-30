@@ -1,0 +1,80 @@
+[
+  {
+    "file": "clean_single_column.pdf",
+    "hidden_text": false,
+    "features": [
+      "clean",
+      "single_column"
+    ]
+  },
+  {
+    "file": "two_column.pdf",
+    "hidden_text": false,
+    "features": [
+      "two_column"
+    ]
+  },
+  {
+    "file": "hidden_white_text.pdf",
+    "hidden_text": true,
+    "features": [
+      "white_text"
+    ]
+  },
+  {
+    "file": "tiny_font.pdf",
+    "hidden_text": true,
+    "features": [
+      "tiny_font"
+    ]
+  },
+  {
+    "file": "off_page.pdf",
+    "hidden_text": true,
+    "features": [
+      "off_page"
+    ]
+  },
+  {
+    "file": "covered_text.pdf",
+    "hidden_text": true,
+    "features": [
+      "covered_text"
+    ]
+  },
+  {
+    "file": "invisible_render_mode.pdf",
+    "hidden_text": true,
+    "features": [
+      "invisible_render_mode"
+    ]
+  },
+  {
+    "file": "table.pdf",
+    "hidden_text": false,
+    "features": [
+      "table"
+    ]
+  },
+  {
+    "file": "rotated.pdf",
+    "hidden_text": false,
+    "features": [
+      "rotated"
+    ]
+  },
+  {
+    "file": "image_only.pdf",
+    "hidden_text": false,
+    "features": [
+      "image_only"
+    ]
+  },
+  {
+    "file": "multi_page.pdf",
+    "hidden_text": false,
+    "features": [
+      "multi_page"
+    ]
+  }
+]
