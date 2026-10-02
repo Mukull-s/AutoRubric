@@ -5,7 +5,12 @@ import { useQuery, useMutation } from '@tanstack/react-query';
 import { getResult, verifyResult, getResultPdf } from '@/lib/api';
 import Link from 'next/link';
 import { AlertCircle, CheckCircle2, ShieldAlert } from 'lucide-react';
-import { PdfViewer } from '@/components/PdfViewer';
+import dynamic from 'next/dynamic';
+
+const PdfViewer = dynamic(
+  () => import('@/components/PdfViewer').then((mod) => mod.PdfViewer),
+  { ssr: false, loading: () => <div className="p-4 bg-gray-100 rounded">Loading PDF Viewer...</div> }
+);
 
 export default function ResultPage() {
   const params = useParams();
