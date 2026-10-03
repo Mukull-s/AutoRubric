@@ -5,7 +5,7 @@ WORKDIR /app
 RUN pip install --no-cache-dir hatchling
 
 COPY pyproject.toml .
-RUN pip install --no-cache-dir .
+RUN pip install --no-cache-dir .[nlp,extraction]
 
 COPY src/ ./src/
 COPY alembic.ini .
