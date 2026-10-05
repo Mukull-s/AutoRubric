@@ -1,7 +1,8 @@
 import { apiClient } from "./client";
 import { LoginResponse, Rubric, Job, CreateRubricRequest } from "./schemas";
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
+const API_URL = (process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000').replace(/\/+$/, '');
+
 
 export async function login(data: Record<string, unknown>): Promise<LoginResponse> {
   return apiClient<LoginResponse>("/auth/login", {

@@ -57,6 +57,8 @@ app.include_router(submissions.router, prefix="/submissions", tags=["submissions
 app.include_router(jobs.router, prefix="/jobs", tags=["jobs"])
 app.include_router(results.router, prefix="/results", tags=["results"])
 app.include_router(cohort.router, prefix="/cohort", tags=["cohort"])
+app.include_router(cohort.router, prefix="/cohorts", tags=["cohorts"])
+
 
 @app.get("/health")
 async def health_check():
