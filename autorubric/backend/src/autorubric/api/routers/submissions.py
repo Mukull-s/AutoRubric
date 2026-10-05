@@ -48,23 +48,51 @@ async def process_upload(file: UploadFile, rubric_id: str, cohort_id: Optional[s
     with open(file_path, "wb") as f:
         f.write(content)
         
+    rubric_dict = None
     async with AsyncSessionLocal() as session:
         sub = Submission(id=doc_id, filename=file.filename or "unknown.pdf", rubric_id=rubric_id, cohort_id=cohort_id)
         job = Job(id=job_id, submission_id=doc_id, status=JobStatus.QUEUED)
         session.add(sub)
         session.add(job)
         await session.commit()
-    
-    # In a real app we'd fetch the rubric from DB
-    import json
-    from pathlib import Path
-    fixture_path = Path(__file__).parents[4] / "tests" / "fixtures" / "rubrics" / "rubric.json"
-    with open(fixture_path) as f:
-        rubric_dict = json.load(f)
+        
+        from autorubric.core.db import RubricModel
+        r_model = await session.get(RubricModel, rubric_id)
+        if r_model and r_model.data:
+            rubric_dict = r_model.data
+
+    if not rubric_dict:
+        try:
+            import json
+            from pathlib import Path
+            fixture_path = Path(__file__).parents[4] / "tests" / "fixtures" / "rubrics" / "rubric.json"
+            if fixture_path.exists():
+                with open(fixture_path) as f:
+                    rubric_dict = json.load(f)
+        except Exception:
+            pass
+
+    if not rubric_dict:
+        rubric_dict = {
+            "id": rubric_id or "r1",
+            "title": "Default Evaluation Rubric",
+            "criteria": [
+                {"id": "c1", "description": "Mentions primary claim and reasoning", "weight": 1.0, "depends_on": []},
+                {"id": "c2", "description": "Provides supporting evidence or details", "weight": 1.0, "depends_on": ["c1"]}
+            ],
+            "credit_map": {
+                "FULL_CREDIT": 1.0,
+                "PARTIAL_CREDIT": 0.5,
+                "NO_CREDIT": 0.0,
+                "MISCONCEPTION": 0.0
+            },
+            "max_score": 2.0
+        }
         
     run_pipeline.delay(job_id, rubric_dict, content.hex())
     
     return {"filename": file.filename, "doc_id": doc_id, "job_id": job_id}
+
 
 @router.post("")
 async def create_submission(
