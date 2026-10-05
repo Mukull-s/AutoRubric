@@ -5,7 +5,7 @@ WORKDIR /app
 RUN pip install --no-cache-dir hatchling
 
 COPY pyproject.toml .
-RUN pip install --no-cache-dir .
+RUN pip install --no-cache-dir . networkx numpy python-dotenv
 
 COPY src/ ./src/
 COPY tests/fixtures/ ./tests/fixtures/
