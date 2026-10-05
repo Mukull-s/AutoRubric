@@ -53,8 +53,38 @@ async def list_rubrics(current_user: dict | None = Depends(get_optional_user)):
 
     return results
 
+import uuid
+from autorubric.contracts.rubric import Criterion, CreditMap
+
 @router.post("")
-async def create_rubric(rubric: Rubric, current_user: dict = Depends(get_current_user)):
+async def create_rubric(payload: dict, current_user: dict | None = Depends(get_optional_user)):
+    # Extract or generate ID
+    rubric_id = payload.get("id") or f"r-{uuid.uuid4().hex[:6]}"
+    title = payload.get("title", "Untitled Rubric")
+    raw_criteria = payload.get("criteria", [])
+    
+    criteria = [Criterion.model_validate(c) for c in raw_criteria]
+    
+    # Calculate or get credit_map
+    if "credit_map" in payload and isinstance(payload["credit_map"], dict):
+        credit_map = CreditMap.model_validate(payload["credit_map"])
+    else:
+        credit_map = CreditMap()
+        
+    # Calculate max_score
+    total_weight = sum(c.weight for c in criteria)
+    max_score = float(payload.get("max_score") or total_weight)
+    if abs(total_weight - max_score) > 1e-4:
+        max_score = total_weight
+        
+    rubric = Rubric(
+        id=rubric_id,
+        title=title,
+        criteria=criteria,
+        credit_map=credit_map,
+        max_score=max_score,
+    )
+
     _rubrics[rubric.id] = rubric
     try:
         async with AsyncSessionLocal() as session:
@@ -64,6 +94,7 @@ async def create_rubric(rubric: Rubric, current_user: dict = Depends(get_current
     except Exception:
         pass
     return rubric
+
 
 @router.get("/{rubric_id}")
 async def get_rubric(rubric_id: str, current_user: dict | None = Depends(get_optional_user)):
