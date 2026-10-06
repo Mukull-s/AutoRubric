@@ -11,6 +11,17 @@ export async function login(data: Record<string, unknown>): Promise<LoginRespons
   });
 }
 
+export async function register(data: Record<string, unknown>): Promise<LoginResponse> {
+  return apiClient<LoginResponse>("/auth/register", {
+    method: "POST",
+    body: JSON.stringify(data),
+  });
+}
+
+export async function getMe(): Promise<unknown> {
+  return apiClient<unknown>("/auth/me");
+}
+
 export async function getRubrics(): Promise<Rubric[]> {
   return apiClient<Rubric[]>("/rubrics");
 }

@@ -2,9 +2,10 @@
 
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import { login } from '@/lib/api';
+import { login, register, getMe } from '@/lib/api';
 
 let memoryToken: string | null = null;
+let cachedUser: any = null;
 
 export function useAuth() {
   const [token, setToken] = useState<string | null>(() => {
@@ -13,6 +14,7 @@ export function useAuth() {
     }
     return null;
   });
+  const [user, setUser] = useState<any>(cachedUser);
   const router = useRouter();
 
   useEffect(() => {
@@ -24,13 +26,32 @@ export function useAuth() {
     }
   }, []);
 
+  const fetchUser = async () => {
+    try {
+      const u = await getMe();
+      cachedUser = u;
+      setUser(u);
+    } catch (e) {
+      console.error('Failed to fetch user', e);
+      doLogout();
+    }
+  };
+
+  useEffect(() => {
+    if (token && !user) {
+      fetchUser();
+    }
+  }, [token, user]);
+
   const doLogin = async (data: Record<string, unknown>) => {
     try {
       const res = await login(data);
       memoryToken = res.access_token;
       sessionStorage.setItem('token', res.access_token);
-      localStorage.setItem('token', res.access_token); // required for API client, though we should really pass it or use memory token. Let's sync memoryToken to localStorage for simplicity with the API client.
+      localStorage.setItem('token', res.access_token);
       setToken(res.access_token);
+      cachedUser = res.user;
+      setUser(res.user);
       router.push('/');
     } catch (e) {
       console.error('Login failed', e);
@@ -38,13 +59,33 @@ export function useAuth() {
     }
   };
 
+  const doRegister = async (data: Record<string, unknown>) => {
+    try {
+      const res = await register(data);
+      memoryToken = res.access_token;
+      sessionStorage.setItem('token', res.access_token);
+      localStorage.setItem('token', res.access_token);
+      setToken(res.access_token);
+      cachedUser = res.user;
+      setUser(res.user);
+      router.push('/');
+    } catch (e) {
+      console.error('Registration failed', e);
+      throw e;
+    }
+  };
+
   const doLogout = () => {
     memoryToken = null;
-    sessionStorage.removeItem('token');
-    localStorage.removeItem('token');
+    cachedUser = null;
+    if (typeof window !== 'undefined') {
+      sessionStorage.removeItem('token');
+      localStorage.removeItem('token');
+    }
     setToken(null);
+    setUser(null);
     router.push('/login');
   };
 
-  return { token, doLogin, doLogout };
+  return { token, user, doLogin, doRegister, doLogout };
 }
