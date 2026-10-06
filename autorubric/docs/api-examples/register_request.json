@@ -1,0 +1,6 @@
+{
+    "email": "test@example.com",
+    "password": "Password123!",
+    "full_name": "Test User",
+    "registration_code": "INVITE-123"
+}

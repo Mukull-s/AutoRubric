@@ -1,11 +1,20 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useAuth } from '@/hooks/useAuth';
+import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import { ShieldCheck, ArrowRight } from 'lucide-react';
 
 export default function LoginPage() {
-  const { doLogin } = useAuth();
+  const { token, doLogin } = useAuth();
+  const router = useRouter();
+  
+  useEffect(() => {
+    if (token) {
+      router.push('/');
+    }
+  }, [token, router]);
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
@@ -56,14 +65,14 @@ export default function LoginPage() {
             <span className="block text-xs font-medium text-zinc-600 mb-1.5 ml-1">
               Username
             </span>
-            <input
-              type="text"
-              className="w-full px-4 py-2.5 rounded-xl bg-white/70 border border-black/[0.08] text-sm text-zinc-900 placeholder:text-zinc-400 focus:bg-white focus:border-zinc-900 focus:ring-4 focus:ring-zinc-900/5 outline-none transition-all duration-200"
-              placeholder="admin@example.com"
-              value={username}
-              onChange={(e) => setUsername(e.target.value)}
-              required
-            />
+              <input
+                type="text"
+                className="w-full px-4 py-2.5 rounded-xl bg-white/70 border border-black/[0.08] text-sm text-zinc-900 placeholder:text-zinc-400 focus:bg-white focus:border-zinc-900 focus:ring-4 focus:ring-zinc-900/5 outline-none transition-all duration-200"
+                placeholder="name@example.com"
+                value={username}
+                onChange={(e) => setUsername(e.target.value)}
+                required
+              />
           </label>
 
           <label className="block">
@@ -92,7 +101,10 @@ export default function LoginPage() {
           </div>
         </form>
 
-        <div className="mt-8 pt-6 border-t border-black/[0.04] text-center">
+        <div className="mt-8 pt-6 border-t border-black/[0.04] text-center flex flex-col items-center gap-3">
+          <Link href="/register" className="text-sm font-medium text-zinc-600 hover:text-zinc-900 transition-colors">
+            Don't have an account? Sign up
+          </Link>
           <span className="text-[11px] text-zinc-400">
             AutoRubric Security & Conformance Verified
           </span>
