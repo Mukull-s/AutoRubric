@@ -35,13 +35,14 @@ def _normalize_redis_url(url: str) -> str:
     return url
 
 class Config:
+    APP_ENV = os.environ.get("APP_ENV", "dev").lower()
     DATABASE_URL = _normalize_db_url(os.environ.get("DATABASE_URL", "postgresql+asyncpg://postgres:postgres@localhost:5432/autorubric"))
     REDIS_URL = _normalize_redis_url(os.environ.get("REDIS_URL", "redis://localhost:6379/0"))
     SECRET_KEY = os.environ.get("SECRET_KEY", "supersecret")
-    ADMIN_EMAIL = os.environ.get("ADMIN_EMAIL", "admin@example.com")
-    ADMIN_PASSWORD_HASH = os.environ.get("ADMIN_PASSWORD_HASH", "$2b$12$XnPs0wsVFTB9pj5EANy8wuW7NGlE2TyUPfqMsLotDLj7M6KBevWsi") # default 'admin'
     JWT_SECRET = os.environ.get("JWT_SECRET", "jwtsecret")
     ACCESS_TOKEN_EXPIRE_MINUTES = int(os.environ.get("ACCESS_TOKEN_EXPIRE_MINUTES", "60"))
+    ALLOW_REGISTRATION = os.environ.get("ALLOW_REGISTRATION", "true").lower() == "true"
+    REGISTRATION_CODE = os.environ.get("REGISTRATION_CODE", None)
     
     STAGE_EXTRACTION_MODE = os.environ.get("STAGE_EXTRACTION_MODE", "real")
     STAGE_SEGMENTATION_MODE = os.environ.get("STAGE_SEGMENTATION_MODE", "real")
@@ -55,4 +56,7 @@ class Config:
 
 
 config = Config()
+
+if config.APP_ENV == "prod" and (not config.JWT_SECRET or config.JWT_SECRET == "jwtsecret"):
+    raise ValueError("In prod, you must set a secure JWT_SECRET. Generate one with: python -c \"import secrets; print(secrets.token_urlsafe(48))\"")
 
