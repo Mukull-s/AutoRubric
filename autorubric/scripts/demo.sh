@@ -1,9 +1,18 @@
 #!/bin/bash
 set -e
 
-echo "Logging in..."
-TOKEN=$(curl -s -X POST http://localhost:8000/auth/login \
-  -d "username=admin@example.com&password=admin" | jq -r .access_token)
+DEMO_EMAIL="demo_${RANDOM}@example.com"
+DEMO_PASS="DemoPassword123!"
+
+echo "Registering demo user..."
+TOKEN=$(curl -s -X POST http://localhost:8000/auth/register \
+  -H "Content-Type: application/json" \
+  -d "{\"email\": \"$DEMO_EMAIL\", \"password\": \"$DEMO_PASS\", \"full_name\": \"Demo User\"}" | jq -r .access_token)
+
+if [[ "$TOKEN" == "null" || -z "$TOKEN" ]]; then
+  echo "Failed to register, checking if token available..."
+  exit 1
+fi
 
 echo "Creating rubric..."
 RUBRIC_ID=$(curl -s -X POST http://localhost:8000/rubrics \
