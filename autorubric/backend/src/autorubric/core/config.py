@@ -8,6 +8,8 @@ load_dotenv(_ENV_PATH)
 
 class Config:
     DATABASE_URL = os.environ.get("DATABASE_URL", "postgresql+asyncpg://postgres:postgres@localhost:5432/autorubric")
+    if DATABASE_URL.startswith("postgresql://"):
+        DATABASE_URL = DATABASE_URL.replace("postgresql://", "postgresql+asyncpg://", 1)
     REDIS_URL = os.environ.get("REDIS_URL", "redis://localhost:6379/0")
     SECRET_KEY = os.environ.get("SECRET_KEY", "supersecret")
     ADMIN_EMAIL = os.environ.get("ADMIN_EMAIL", "admin@example.com")
