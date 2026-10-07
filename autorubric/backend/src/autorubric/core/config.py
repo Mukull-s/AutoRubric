@@ -14,6 +14,7 @@ class Config:
     ADMIN_PASSWORD_HASH = os.environ.get("ADMIN_PASSWORD_HASH", "$2b$12$XnPs0wsVFTB9pj5EANy8wuW7NGlE2TyUPfqMsLotDLj7M6KBevWsi") # default 'admin'
     JWT_SECRET = os.environ.get("JWT_SECRET", "jwtsecret")
     ACCESS_TOKEN_EXPIRE_MINUTES = int(os.environ.get("ACCESS_TOKEN_EXPIRE_MINUTES", "60"))
+    ALLOWED_ORIGINS = os.environ.get("ALLOWED_ORIGINS", "http://localhost:3000").split(",")
     
     STAGE_EXTRACTION_MODE = os.environ.get("STAGE_EXTRACTION_MODE", "real")
     STAGE_SEGMENTATION_MODE = os.environ.get("STAGE_SEGMENTATION_MODE", "real")
