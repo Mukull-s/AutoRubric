@@ -96,3 +96,16 @@ async def verify_result(doc_id: str, current_user: dict = Depends(get_current_us
 
     return {"match": True, "differences": []}
 
+@router.get("/{doc_id}/propositions")
+async def get_result_propositions(doc_id: str, current_user: dict = Depends(get_current_user)):
+    from autorubric.core.db import AsyncSessionLocal, Result
+    from sqlalchemy import select
+    
+    async with AsyncSessionLocal() as session:
+        result = await session.execute(select(Result).where(Result.doc_id == doc_id))
+        res = result.scalar_one_or_none()
+        if not res:
+            raise HTTPException(status_code=404, detail="Result not found")
+            
+        data = res.data
+        return {"propositions": data.get("propositions", [])}
