@@ -3,12 +3,44 @@ import { http, HttpResponse, delay } from 'msw'
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
 
 export const handlers = [
-  http.post(`${API_URL}/auth/login`, async () => {
-    await delay(500);
+  http.post(`${API_URL}/auth/register`, async ({ request }) => {
+    const data = await request.json() as any;
+    if (data.email === "duplicate@example.com") {
+      return HttpResponse.json({ detail: "Email already registered" }, { status: 409 });
+    }
+    if (data.password === "password123") {
+      return HttpResponse.json({ detail: "Password must be at least 10 characters" }, { status: 422 });
+    }
+    if (data.email === "rate@example.com") {
+      return HttpResponse.json({ detail: "Too many attempts" }, { status: 429, headers: { 'Retry-After': '900' } });
+    }
     return HttpResponse.json({
-      access_token: "fake-super-secret-token",
-      token_type: "bearer"
-    })
+      access_token: "fake-jwt-token",
+      token_type: "bearer",
+      user: { id: "123", email: data.email, full_name: data.full_name || null, role: "teacher" }
+    }, { status: 201 });
+  }),
+
+  http.post(`${API_URL}/auth/login`, async ({ request }) => {
+    await delay(500);
+    const data = await request.json() as any;
+    if (data.username === "wrong@example.com") {
+      return HttpResponse.json({ detail: "Invalid email or password" }, { status: 401 });
+    }
+    return HttpResponse.json({
+      access_token: "fake-jwt-token",
+      token_type: "bearer",
+      user: { id: "123", email: data.username, full_name: "Mock User", role: "teacher" }
+    });
+  }),
+
+  http.get(`${API_URL}/auth/me`, async () => {
+    return HttpResponse.json({
+      id: "123",
+      email: "mock@example.com",
+      full_name: "Mock User",
+      role: "teacher"
+    });
   }),
 
   http.get(`${API_URL}/rubrics`, async () => {

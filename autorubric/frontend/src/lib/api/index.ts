@@ -1,13 +1,25 @@
 import { apiClient } from "./client";
 import { LoginResponse, Rubric, Job, CreateRubricRequest } from "./schemas";
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
+const API_URL = (process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000').replace(/\/+$/, '');
+
 
 export async function login(data: Record<string, unknown>): Promise<LoginResponse> {
   return apiClient<LoginResponse>("/auth/login", {
     method: "POST",
     body: JSON.stringify(data),
   });
+}
+
+export async function register(data: Record<string, unknown>): Promise<LoginResponse> {
+  return apiClient<LoginResponse>("/auth/register", {
+    method: "POST",
+    body: JSON.stringify(data),
+  });
+}
+
+export async function getMe(): Promise<unknown> {
+  return apiClient<unknown>("/auth/me");
 }
 
 export async function getRubrics(): Promise<Rubric[]> {
@@ -19,11 +31,25 @@ export async function getRubric(id: string): Promise<Rubric> {
 }
 
 export async function createRubric(data: CreateRubricRequest): Promise<Rubric> {
+  const totalWeight = data.criteria.reduce((sum, c) => sum + (c.weight || 0), 0);
+  const fullPayload = {
+    id: `r-${Date.now().toString(36)}`,
+    title: data.title,
+    criteria: data.criteria,
+    credit_map: {
+      FULL_CREDIT: 1.0,
+      PARTIAL_CREDIT: 0.5,
+      NO_CREDIT: 0.0,
+      MISCONCEPTION: 0.0,
+    },
+    max_score: totalWeight,
+  };
   return apiClient<Rubric>("/rubrics", {
     method: "POST",
-    body: JSON.stringify(data),
+    body: JSON.stringify(fullPayload),
   });
 }
+
 
 export async function getJob(jobId: string): Promise<Job> {
   return apiClient<Job>(`/jobs/${jobId}`);
