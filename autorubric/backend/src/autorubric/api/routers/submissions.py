@@ -179,21 +179,23 @@ async def process_upload(file: UploadFile, rubric_id: str, cohort_id: Optional[s
             "max_score": 2.0
         }
         
-    # 4. Dispatch to Celery, with automatic thread fallback if Redis is down
-    dispatched = False
+    # 4. Dispatch pipeline execution:
+    # Always spawn background thread inside Uvicorn so progress and completion are guaranteed
+    thread = threading.Thread(
+        target=execute_pipeline_safely,
+        args=(job_id, doc_id, rubric_dict, content.hex()),
+        daemon=True,
+    )
+    thread.start()
+
+    # Also attempt dispatching to Celery queue if running
     try:
         run_pipeline.delay(job_id, rubric_dict, content.hex())
-        dispatched = True
     except Exception as e:
-        logger.warning(f"Celery dispatch failed ({e}); running pipeline asynchronously via fallback thread.")
-        thread = threading.Thread(
-            target=execute_pipeline_safely,
-            args=(job_id, doc_id, rubric_dict, content.hex()),
-            daemon=True,
-        )
-        thread.start()
+        logger.info(f"Celery dispatch note: {e}")
     
     return {"filename": file.filename, "doc_id": doc_id, "job_id": job_id, "status": "QUEUED"}
+
 
 
 
