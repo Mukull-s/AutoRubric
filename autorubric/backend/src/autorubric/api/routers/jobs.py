@@ -1,12 +1,13 @@
 from fastapi import APIRouter, Depends, HTTPException
-from ..deps import get_current_user
+from typing import Optional, Dict, Any
+from ..deps import get_optional_user
 from autorubric.contracts import JobStatus
 from datetime import datetime
 
 router = APIRouter()
 
 @router.get("/{job_id}")
-async def get_job_status(job_id: str, current_user: dict = Depends(get_current_user)):
+async def get_job_status(job_id: str, current_user: Optional[Dict[str, Any]] = Depends(get_optional_user)):
     from autorubric.core.db import AsyncSessionLocal, Job, JobEvent
     from sqlalchemy import select
 
@@ -30,6 +31,7 @@ async def get_job_status(job_id: str, current_user: dict = Depends(get_current_u
                 return {
                     "job_id": job.id,
                     "submission_id": job.submission_id,
+                    "doc_id": job.submission_id,
                     "status": job.status,
                     "error": job.error,
                     "created_at": job.created_at.isoformat() if job.created_at else datetime.utcnow().isoformat(),
@@ -42,6 +44,8 @@ async def get_job_status(job_id: str, current_user: dict = Depends(get_current_u
     # Fallback status if job not in DB
     return {
         "job_id": job_id,
+        "submission_id": job_id,
+        "doc_id": job_id,
         "status": JobStatus.DONE,
         "error": None,
         "created_at": datetime.utcnow().isoformat(),
@@ -50,7 +54,8 @@ async def get_job_status(job_id: str, current_user: dict = Depends(get_current_u
     }
 
 @router.post("/{job_id}/retry")
-async def retry_job(job_id: str, current_user: dict = Depends(get_current_user)):
+async def retry_job(job_id: str, current_user: Optional[Dict[str, Any]] = Depends(get_optional_user)):
     # Mocking retry logic
     return {"message": "Job requeued", "job_id": job_id}
+
 

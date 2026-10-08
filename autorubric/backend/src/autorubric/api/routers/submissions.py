@@ -3,7 +3,7 @@ from typing import Annotated, Optional
 import uuid
 import os
 import fitz  # PyMuPDF
-from ..deps import get_current_user
+from ..deps import get_optional_user
 from autorubric.workers.tasks import run_pipeline
 from autorubric.core.config import config
 from autorubric.core.db import AsyncSessionLocal, Submission, Job
@@ -98,26 +98,38 @@ async def process_upload(file: UploadFile, rubric_id: str, cohort_id: Optional[s
 async def create_submission(
     rubric_id: Annotated[str, Form()],
     file: UploadFile = File(...),
-    current_user: dict = Depends(get_current_user)
+    current_user: Optional[dict] = Depends(get_optional_user)
 ):
     result = await process_upload(file, rubric_id)
-    return {"job_id": result["job_id"]}
+    return {"job_id": result["job_id"], "doc_id": result["doc_id"], "status": "QUEUED"}
 
 @router.post("/batch")
 async def create_batch_submission(
     rubric_id: Annotated[str, Form()],
     files: list[UploadFile] = File(...),
     cohort_id: Optional[str] = Form(None),
-    current_user: dict = Depends(get_current_user)
+    cohort_name: Optional[str] = Form(None),
+    current_user: Optional[dict] = Depends(get_optional_user)
 ):
+    effective_cohort_id = cohort_id or cohort_name or f"cohort-{uuid.uuid4().hex[:8]}"
     results = []
     errors = []
     
     for file in files:
         try:
-            res = await process_upload(file, rubric_id, cohort_id)
+            res = await process_upload(file, rubric_id, effective_cohort_id)
             results.append(res)
         except HTTPException as e:
             errors.append({"filename": file.filename, "error": e.detail})
             
-    return {"results": results, "errors": errors}
+    jobs_summary = [
+        {"job_id": r["job_id"], "file_name": r["filename"], "doc_id": r["doc_id"]}
+        for r in results
+    ]
+    return {
+        "cohort_id": effective_cohort_id,
+        "jobs": jobs_summary,
+        "results": results,
+        "errors": errors
+    }
+

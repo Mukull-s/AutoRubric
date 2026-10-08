@@ -16,7 +16,8 @@ export async function apiClient<T>(
   endpoint: string,
   options: RequestInit = {}
 ): Promise<T> {
-  const token = typeof window !== 'undefined' ? localStorage.getItem("token") : null;
+  const rawToken = typeof window !== 'undefined' ? (localStorage.getItem("token") || sessionStorage.getItem("token")) : null;
+  const token = rawToken && rawToken !== "null" && rawToken !== "undefined" && rawToken !== "None" ? rawToken : null;
   const headers = new Headers(options.headers || {});
   
   if (token) {
@@ -34,6 +35,8 @@ export async function apiClient<T>(
 
   if (response.status === 401) {
     if (typeof window !== 'undefined') {
+      localStorage.removeItem("token");
+      sessionStorage.removeItem("token");
       window.location.href = "/login";
     }
     throw new ApiError("Unauthorized", 401);

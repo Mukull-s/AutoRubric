@@ -40,15 +40,23 @@ export async function createRubric(data: CreateRubricRequest): Promise<Rubric> {
 }
 
 
+function getAuthHeaders(): Record<string, string> {
+  if (typeof window === 'undefined') return {};
+  const token = localStorage.getItem('token') || sessionStorage.getItem('token');
+  if (token && token !== 'null' && token !== 'undefined' && token !== 'None') {
+    return { 'Authorization': `Bearer ${token}` };
+  }
+  return {};
+}
+
 export async function getJob(jobId: string): Promise<Job> {
   return apiClient<Job>(`/jobs/${jobId}`);
 }
 
-export async function submitSingle(formData: FormData): Promise<{ job_id: string, status: string }> {
-  const token = localStorage.getItem('token') || sessionStorage.getItem('token');
+export async function submitSingle(formData: FormData): Promise<{ job_id: string, doc_id?: string, status?: string }> {
   const res = await fetch(`${API_URL}/submissions`, {
     method: 'POST',
-    headers: { 'Authorization': `Bearer ${token}` },
+    headers: getAuthHeaders(),
     body: formData,
   });
   if (!res.ok) throw new Error(await res.text());
@@ -56,10 +64,9 @@ export async function submitSingle(formData: FormData): Promise<{ job_id: string
 }
 
 export async function submitBatch(formData: FormData): Promise<{ cohort_id: string, jobs: { job_id: string, file_name: string }[] }> {
-  const token = localStorage.getItem('token') || sessionStorage.getItem('token');
   const res = await fetch(`${API_URL}/submissions/batch`, {
     method: 'POST',
-    headers: { 'Authorization': `Bearer ${token}` },
+    headers: getAuthHeaders(),
     body: formData,
   });
   if (!res.ok) throw new Error(await res.text());
@@ -71,10 +78,9 @@ export async function getCohort(id: string): Promise<unknown> {
 }
 
 export async function retryJob(jobId: string): Promise<unknown> {
-  const token = localStorage.getItem('token') || sessionStorage.getItem('token');
   const res = await fetch(`${API_URL}/jobs/${jobId}/retry`, {
     method: 'POST',
-    headers: { 'Authorization': `Bearer ${token}` }
+    headers: getAuthHeaders(),
   });
   if (!res.ok) throw new Error(await res.text());
   return res.json();
@@ -85,21 +91,17 @@ export async function getResult(docId: string): Promise<unknown> {
 }
 
 export async function verifyResult(docId: string): Promise<unknown> {
-  const token = localStorage.getItem('token') || sessionStorage.getItem('token');
   const res = await fetch(`${API_URL}/results/${docId}/verify`, {
     method: 'POST',
-    headers: { 'Authorization': `Bearer ${token}` }
+    headers: getAuthHeaders(),
   });
   if (!res.ok) throw new Error(await res.text());
   return res.json();
 }
 
 export async function getResultPdf(docId: string): Promise<Blob> {
-  const token = localStorage.getItem('token') || sessionStorage.getItem('token');
   const res = await fetch(`${API_URL}/results/${docId}/pdf`, {
-    headers: {
-      'Authorization': `Bearer ${token}`
-    }
+    headers: getAuthHeaders(),
   });
   
   if (!res.ok) {
@@ -112,3 +114,4 @@ export async function getResultPdf(docId: string): Promise<Blob> {
 export async function getCollusion(cohortId: string): Promise<unknown> {
   return apiClient<unknown>(`/cohorts/${cohortId}/collusion`);
 }
+
