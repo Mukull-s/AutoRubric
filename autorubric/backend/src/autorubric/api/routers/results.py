@@ -26,11 +26,19 @@ async def get_result(doc_id: str, current_user: Optional[Dict[str, Any]] = Depen
                 data["annotated_pdf_available"] = os.path.exists(pdf_path)
                 data["needs_review"] = res.needs_review
                 data["doc_id"] = doc_id
-                return data
     except Exception:
         pass
 
+    # Check in-memory store
+    from autorubric.core.store import in_memory_results
+    if doc_id in in_memory_results:
+        data = dict(in_memory_results[doc_id])
+        data["doc_id"] = doc_id
+        data["annotated_pdf_available"] = True
+        return data
+
     # Fallback to fixture data for demo / newly uploaded documents
+
     try:
         fixture_path = Path(__file__).parents[4] / "tests" / "fixtures" / "scorer" / "score_result.json"
         if fixture_path.exists():

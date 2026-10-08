@@ -41,7 +41,14 @@ async def get_job_status(job_id: str, current_user: Optional[Dict[str, Any]] = D
     except Exception:
         pass
 
+
+    # Check in-memory store
+    from autorubric.core.store import in_memory_jobs
+    if job_id in in_memory_jobs:
+        return in_memory_jobs[job_id]
+
     # Fallback status if job not in DB
+
     return {
         "job_id": job_id,
         "submission_id": job_id,
