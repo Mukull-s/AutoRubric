@@ -8,12 +8,53 @@ from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession
 from sqlalchemy.orm import declarative_base, sessionmaker
 from autorubric.core.config import config
 
-engine = create_async_engine(config.DATABASE_URL, echo=False)
+import time
+import logging
+
+logger = logging.getLogger(__name__)
+
+connect_args = {}
+if "asyncpg" in config.DATABASE_URL:
+    connect_args = {
+        "timeout": 2.0,
+        "command_timeout": 2.0,
+    }
+
+engine = create_async_engine(
+    config.DATABASE_URL,
+    echo=False,
+    connect_args=connect_args,
+    pool_pre_ping=True,
+    pool_recycle=300,
+)
 AsyncSessionLocal = sessionmaker(
     engine, class_=AsyncSession, expire_on_commit=False
 )
 
+_db_healthy: bool = True
+_last_db_failure: float = 0.0
+
+def mark_db_failure():
+    global _db_healthy, _last_db_failure
+    _db_healthy = False
+    _last_db_failure = time.time()
+
+def mark_db_success():
+    global _db_healthy
+    _db_healthy = True
+
+def is_db_available() -> bool:
+    global _db_healthy, _last_db_failure
+    if not _db_healthy:
+        # Retry connection only every 60 seconds
+        if time.time() - _last_db_failure > 60.0:
+            _db_healthy = True
+            return True
+        return False
+    return True
+
 Base = declarative_base()
+
 
 class User(Base):
     __tablename__ = "users"

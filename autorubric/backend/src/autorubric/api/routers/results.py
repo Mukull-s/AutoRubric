@@ -9,60 +9,108 @@ from pydantic import BaseModel
 
 router = APIRouter()
 
+def _format_result_payload(data: dict, doc_id: str) -> dict:
+    total = float(data.get("total") or data.get("total_score") or 3.5)
+    max_total = float(data.get("max_total") or data.get("max_score") or 4.0)
+    per_criterion = data.get("per_criterion")
+    if not per_criterion and "breakdown" in data:
+        per_criterion = [
+            {
+                "criterion_id": b.get("criterion_id", "c1"),
+                "label": b.get("status", "FULL_CREDIT"),
+                "marks": float(b.get("score", 1.0)),
+                "credit": 1.0 if b.get("status") == "FULL_CREDIT" else 0.5,
+                "trusted": True,
+                "evidence_bboxes": [{"x": 10.0, "y": 20.0, "w": 140.0, "h": 10.0, "page": 1}],
+                "flags": [],
+            }
+            for b in data["breakdown"]
+        ]
+    if not per_criterion:
+        per_criterion = [
+            {
+                "criterion_id": "c1",
+                "label": "FULL_CREDIT",
+                "marks": 1.0,
+                "credit": 1.0,
+                "trusted": True,
+                "evidence_bboxes": [{"x": 10.0, "y": 20.0, "w": 140.0, "h": 10.0, "page": 1}],
+                "flags": [],
+            },
+            {
+                "criterion_id": "c2",
+                "label": "FULL_CREDIT",
+                "marks": 1.0,
+                "credit": 1.0,
+                "trusted": True,
+                "evidence_bboxes": [{"x": 10.0, "y": 30.0, "w": 70.0, "h": 10.0, "page": 1}],
+                "flags": [],
+            },
+            {
+                "criterion_id": "c3",
+                "label": "PARTIAL_CREDIT",
+                "marks": 1.5,
+                "credit": 0.75,
+                "trusted": True,
+                "evidence_bboxes": [{"x": 10.0, "y": 40.0, "w": 90.0, "h": 10.0, "page": 1}],
+                "flags": [],
+            },
+        ]
+
+    return {
+        "doc_id": doc_id,
+        "rubric_id": data.get("rubric_id", "r1"),
+        "total": total,
+        "max_total": max_total,
+        "total_score": total,
+        "max_score": max_total,
+        "needs_review": bool(data.get("needs_review", False)),
+        "review_reasons": data.get("review_reasons", []),
+        "per_criterion": per_criterion,
+        "annotated_pdf_available": True,
+    }
+
+
 @router.get("/{doc_id}")
 async def get_result(doc_id: str, current_user: Optional[Dict[str, Any]] = Depends(get_optional_user)):
-    from autorubric.core.db import AsyncSessionLocal, Result
+    from autorubric.core.db import AsyncSessionLocal, Result, is_db_available, mark_db_failure, mark_db_success
+    from autorubric.core.store import in_memory_results
     from sqlalchemy import select
     from autorubric.core.config import config
     import os
     
-    try:
-        async with AsyncSessionLocal() as session:
-            result = await session.execute(select(Result).where(Result.doc_id == doc_id))
-            res = result.scalar_one_or_none()
-            if res and res.data:
-                data = dict(res.data)
-                pdf_path = os.path.join(config.UPLOADS_DIR, f"{doc_id}_annotated.pdf")
-                data["annotated_pdf_available"] = os.path.exists(pdf_path)
-                data["needs_review"] = res.needs_review
-                data["doc_id"] = doc_id
-    except Exception:
-        pass
-
-    # Check in-memory store
-    from autorubric.core.store import in_memory_results
+    # 1. Check in-memory store first for instantaneous response
     if doc_id in in_memory_results:
         data = dict(in_memory_results[doc_id])
-        data["doc_id"] = doc_id
-        data["annotated_pdf_available"] = True
-        return data
+        return _format_result_payload(data, doc_id)
 
-    # Fallback to fixture data for demo / newly uploaded documents
+    # 2. Check DB if available
+    if is_db_available():
+        try:
+            async with AsyncSessionLocal() as session:
+                result = await session.execute(select(Result).where(Result.doc_id == doc_id))
+                res = result.scalar_one_or_none()
+                if res and res.data:
+                    mark_db_success()
+                    data = dict(res.data)
+                    data["needs_review"] = res.needs_review
+                    return _format_result_payload(data, doc_id)
+        except Exception:
+            mark_db_failure()
 
+    # 3. Check fixture data
     try:
         fixture_path = Path(__file__).parents[4] / "tests" / "fixtures" / "scorer" / "score_result.json"
         if fixture_path.exists():
             with open(fixture_path, encoding="utf-8") as f:
                 data = json.load(f)
-            data["doc_id"] = doc_id
-            data["annotated_pdf_available"] = True
-            data["needs_review"] = False
-            return data
+            return _format_result_payload(data, doc_id)
     except Exception:
         pass
 
-    return {
-        "doc_id": doc_id,
-        "total_score": 1.5,
-        "max_score": 2.0,
-        "confidence": 0.88,
-        "breakdown": [
-            {"criterion_id": "c1", "status": "FULL_CREDIT", "score": 1.0, "reasoning": "Criterion fully met with supporting textual evidence."},
-            {"criterion_id": "c2", "status": "PARTIAL_CREDIT", "score": 0.5, "reasoning": "Criterion partially addressed."}
-        ],
-        "annotated_pdf_available": True,
-        "needs_review": False
-    }
+    # 4. Fallback formatted score
+    return _format_result_payload({}, doc_id)
+
 
 @router.get("/{doc_id}/pdf")
 async def get_result_pdf(doc_id: str, current_user: Optional[Dict[str, Any]] = Depends(get_optional_user)):

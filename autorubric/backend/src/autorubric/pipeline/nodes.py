@@ -37,48 +37,58 @@ def track_stage(stage_name: str, new_status: JobStatus):
             started_at = datetime.datetime.now(datetime.UTC)
             state["status"] = new_status
             
-            from autorubric.core.db import AsyncSessionLocal, Job, JobEvent
+            # Immediately update in-memory state so frontend poller sees live progress
+            from autorubric.core.store import in_memory_jobs
+            if job_id in in_memory_jobs:
+                in_memory_jobs[job_id]["status"] = new_status
             
-            async def log_start():
+            from autorubric.core.db import AsyncSessionLocal, Job, JobEvent, is_db_available, mark_db_failure, mark_db_success
+            
+            if is_db_available():
+                async def log_start():
+                    try:
+                        async with AsyncSessionLocal() as session:
+                            import uuid
+                            job = await session.get(Job, job_id)
+                            if job:
+                                job.status = new_status
+                            event = JobEvent(id=str(uuid.uuid4()), job_id=job_id, stage=stage_name, started_at=started_at)
+                            session.add(event)
+                            await session.commit()
+                            mark_db_success()
+                    except Exception:
+                        mark_db_failure()
+                
                 try:
-                    async with AsyncSessionLocal() as session:
-                        import uuid
-                        job = await session.get(Job, job_id)
-                        if job:
-                            job.status = new_status
-                        event = JobEvent(id=str(uuid.uuid4()), job_id=job_id, stage=stage_name, started_at=started_at)
-                        session.add(event)
-                        await session.commit()
+                    _run_sync(log_start())
                 except Exception:
-                    pass
-            
-            try:
-                _run_sync(log_start())
-            except Exception:
-                pass
+                    mark_db_failure()
             
             try:
                 new_state = func(state)
                 
-                async def log_success():
+                if is_db_available():
+                    async def log_success():
+                        try:
+                            async with AsyncSessionLocal() as session:
+                                from sqlalchemy import select
+                                stmt = select(JobEvent).where(JobEvent.job_id == job_id, JobEvent.stage == stage_name).order_by(JobEvent.started_at.desc())
+                                event = (await session.execute(stmt)).scalars().first()
+                                if event:
+                                    event.finished_at = datetime.datetime.now(datetime.UTC)
+                                    event.ok = True
+                                await session.commit()
+                                mark_db_success()
+                        except Exception:
+                            mark_db_failure()
+                    
                     try:
-                        async with AsyncSessionLocal() as session:
-                            from sqlalchemy import select
-                            stmt = select(JobEvent).where(JobEvent.job_id == job_id, JobEvent.stage == stage_name).order_by(JobEvent.started_at.desc())
-                            event = (await session.execute(stmt)).scalars().first()
-                            if event:
-                                event.finished_at = datetime.datetime.now(datetime.UTC)
-                                event.ok = True
-                            await session.commit()
+                        _run_sync(log_success())
                     except Exception:
-                        pass
-                
-                try:
-                    _run_sync(log_success())
-                except Exception:
-                    pass
-                
+                        mark_db_failure()
+
                 return new_state
+
             except Exception as e:
                 async def log_failure():
                     try:
