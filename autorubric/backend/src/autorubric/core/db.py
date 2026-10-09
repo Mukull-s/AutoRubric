@@ -3,6 +3,9 @@ from sqlalchemy import Column, String, Float, JSON, DateTime, Boolean, Enum
 from sqlalchemy.dialects.postgresql import JSONB
 from autorubric.contracts import JobStatus
 import datetime
+import uuid
+from sqlalchemy import Column, String, Float, JSON, DateTime, Boolean, Enum, Index, func
+from sqlalchemy.dialects.postgresql import JSONB, UUID
 
 from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession
 from sqlalchemy.orm import declarative_base, sessionmaker
@@ -19,9 +22,18 @@ JSON_TYPE = JSON().with_variant(JSONB(), "postgresql")
 
 class User(Base):
     __tablename__ = "users"
-    id = Column(String, primary_key=True)
-    username = Column(String, unique=True, nullable=False)
-    hashed_password = Column(String, nullable=False)
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    email = Column(String, nullable=False)
+    password_hash = Column(String, nullable=False)
+    full_name = Column(String, nullable=True)
+    role = Column(String, default="teacher", nullable=False)
+    is_active = Column(Boolean, default=True, nullable=False)
+    created_at = Column(DateTime, default=datetime.datetime.utcnow, nullable=False)
+    last_login_at = Column(DateTime, nullable=True)
+
+    __table_args__ = (
+        Index("ix_users_email_lower", func.lower(email), unique=True),
+    )
 
 class RubricModel(Base):
     __tablename__ = "rubrics"

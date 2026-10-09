@@ -53,25 +53,22 @@ async def process_upload(
     with open(file_path, "wb") as f:
         f.write(content)
         
-    async with AsyncSessionLocal() as session:
-        sub = Submission(id=doc_id, filename=file.filename or "unknown.pdf", rubric_id=rubric_id, cohort_id=cohort_id)
-        job = Job(id=job_id, submission_id=doc_id, status=JobStatus.QUEUED)
-        session.add(sub)
-        session.add(job)
-        await session.commit()
-    
-    # Retrieve the actual selected rubric from DB or in-memory store
+    from autorubric.core.db import RubricModel
+    from sqlalchemy import select
+
     rubric_dict = None
     try:
-        from autorubric.core.db import RubricModel
-        from sqlalchemy import select
         async with AsyncSessionLocal() as session:
-            res = await session.execute(select(RubricModel).where(RubricModel.id == rubric_id))
-            row = res.scalar_one_or_none()
-            if row:
-                rubric_dict = row.data
-    except Exception:
-        pass
+            r_model = await session.get(RubricModel, rubric_id)
+            if r_model and r_model.data:
+                rubric_dict = r_model.data
+            sub = Submission(id=doc_id, filename=file.filename or "unknown.pdf", rubric_id=rubric_id, cohort_id=cohort_id)
+            job = Job(id=job_id, submission_id=doc_id, status=JobStatus.QUEUED)
+            session.add(sub)
+            session.add(job)
+            await session.commit()
+    except Exception as e:
+        logger.warning(f"DB submission create warning: {e}")
 
     if not rubric_dict:
         from .rubrics import _rubrics
@@ -83,25 +80,35 @@ async def process_upload(
         from pathlib import Path
         fixture_path = Path(__file__).parents[4] / "tests" / "fixtures" / "rubrics" / "rubric.json"
         if fixture_path.exists():
-            with open(fixture_path) as f:
+            with open(fixture_path, encoding="utf-8") as f:
                 rubric_dict = json.load(f)
 
-    # Execute pipeline asynchronously in background thread so it finishes immediately without needing celery worker
-    def _safe_run():
-        try:
-            print(f"[PIPELINE] Starting pipeline execution for job: {job_id}")
-            from autorubric.workers.tasks import execute_pipeline_sync
-            res = execute_pipeline_sync(job_id, rubric_dict, content, doc_id)
-            print(f"[PIPELINE] Successfully finished job {job_id}: {res}")
-        except Exception as e:
-            import traceback
-            print(f"[PIPELINE ERROR] Failed job {job_id}: {e}\n{traceback.format_exc()}")
+    if not rubric_dict:
+        raise HTTPException(status_code=404, detail=f"Rubric '{rubric_id}' not found")
 
-    import threading
-    t = threading.Thread(target=_safe_run, daemon=True)
-    t.start()
+    # Run pipeline via Celery if available, or async background thread for local/dev resilience
+    dispatched = False
+    try:
+        run_pipeline.delay(job_id, rubric_dict, content.hex())
+        dispatched = True
+    except Exception:
+        dispatched = False
+
+    if not dispatched:
+        def _safe_run():
+            try:
+                from autorubric.workers.tasks import execute_pipeline_sync
+                execute_pipeline_sync(job_id, rubric_dict, content, doc_id)
+            except Exception as e:
+                import traceback
+                print(f"[PIPELINE ERROR] Failed job {job_id}: {e}\n{traceback.format_exc()}")
+
+        import threading
+        t = threading.Thread(target=_safe_run, daemon=True)
+        t.start()
     
     return {"filename": file.filename, "doc_id": doc_id, "job_id": job_id}
+
 
 @router.post("")
 async def create_submission(

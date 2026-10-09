@@ -3,6 +3,7 @@ from autorubric.pipeline.graph import build_graph
 from autorubric.contracts import JobStatus, Rubric
 from autorubric.core.errors import TransientError, PermanentError
 import traceback
+import os
 
 import asyncio
 import concurrent.futures
@@ -145,8 +146,7 @@ def run_pipeline(self, job_id: str, rubric_dict: dict, pdf_bytes_hex: str, doc_i
 @celery_app.task(bind=True, queue="gpu_queue")
 def evaluate_task(self, candidates_json: list[dict]):
     from autorubric.evaluator import classify
-    from autorubric.contracts import Candidate
-    candidates = [Candidate.model_validate(c) for c in candidates_json]
-    classifications = classify(candidates)
+    from autorubric.contracts import EvalPair
+    pairs = [EvalPair.model_validate(c) for c in candidates_json]
+    classifications = classify(pairs)
     return [c.model_dump() for c in classifications]
-

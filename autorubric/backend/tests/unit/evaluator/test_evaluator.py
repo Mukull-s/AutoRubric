@@ -8,6 +8,11 @@ def test_classify_empty_input():
     assert classify([]) == []
 
 
+def test_classify_rejects_missing_text():
+    with pytest.raises(ValueError, match="similarity alone cannot determine"):
+        classify([Candidate(prop_id="p1", criterion_id="c1", similarity=0.99)])
+
+
 def test_classify_ordering_and_deterministic_ids():
     pairs = [
         EvalPair(prop_id="p1", criterion_id="c1", proposition_text="Plant cell chloroplasts absorb sunlight.", criterion_text="Chloroplasts absorb sunlight for photosynthesis."),

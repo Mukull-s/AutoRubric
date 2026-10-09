@@ -1,0 +1,31 @@
+{
+  "id": "demo_rubric",
+  "title": "Photosynthesis Concepts",
+  "max_score": 10.0,
+  "credit_map": {
+    "FULL_CREDIT": 1.0,
+    "PARTIAL_CREDIT": 0.5,
+    "NO_CREDIT": 0.0,
+    "MISCONCEPTION": 0.0
+  },
+  "criteria": [
+    {
+      "id": "c1",
+      "description": "Defines photosynthesis.",
+      "weight": 3.0,
+      "depends_on": []
+    },
+    {
+      "id": "c2",
+      "description": "Explains the mechanism (chlorophyll absorbing sunlight).",
+      "weight": 4.0,
+      "depends_on": ["c1"]
+    },
+    {
+      "id": "c3",
+      "description": "Gives an example of oxygen release.",
+      "weight": 3.0,
+      "depends_on": ["c2"]
+    }
+  ]
+}

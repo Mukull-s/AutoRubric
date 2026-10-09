@@ -1,117 +1,149 @@
-from fastapi import APIRouter, Depends, HTTPException, Body
-from pydantic import BaseModel, Field
-from typing import Optional, List, Union
-import uuid
+from __future__ import annotations
+
 import json
+import uuid
 import logging
 from pathlib import Path
+from typing import Optional, Dict, Any, List, Union
+
+from fastapi import APIRouter, Depends, HTTPException, Body
+from fastapi.security import OAuth2PasswordBearer
+from jose import JWTError, jwt
 from sqlalchemy import select
 
-from autorubric.contracts import Rubric, Criterion, CreditMap
+from autorubric.contracts import Rubric
+from autorubric.contracts.rubric import Criterion, CreditMap
+from autorubric.core.config import config
 from autorubric.core.db import AsyncSessionLocal, RubricModel
-from ..deps import get_current_user
 
 logger = logging.getLogger(__name__)
-
 router = APIRouter()
 
-# In-memory store for fallback / tests
-_rubrics = {}
+# Optional auth scheme for read and creation operations
+oauth2_scheme_optional = OAuth2PasswordBearer(tokenUrl="auth/login", auto_error=False)
 
 
-class CreateRubricPayload(BaseModel):
-    id: Optional[str] = None
-    title: str
-    criteria: List[Criterion]
-    credit_map: Optional[CreditMap] = None
-    max_score: Optional[float] = None
-
-
-@router.post("")
-async def create_rubric(
-    payload: Union[Rubric, CreateRubricPayload] = Body(...),
-    current_user: dict = Depends(get_current_user)
-):
-    rubric_id = getattr(payload, "id", None) or f"r_{uuid.uuid4().hex[:8]}"
-    criteria = payload.criteria
-    credit_map = getattr(payload, "credit_map", None) or CreditMap()
-    total_weight = sum(c.weight for c in criteria)
-    max_score = getattr(payload, "max_score", None) or total_weight
-
-    rubric = Rubric(
-        id=rubric_id,
-        title=payload.title,
-        criteria=criteria,
-        credit_map=credit_map,
-        max_score=max_score
-    )
-
-    _rubrics[rubric.id] = rubric
-
+def get_optional_user(token: Optional[str] = Depends(oauth2_scheme_optional)) -> Optional[Dict[str, Any]]:
+    if not token:
+        return None
     try:
-        async with AsyncSessionLocal() as session:
-            model = RubricModel(
-                id=rubric.id,
-                title=rubric.title,
-                data=rubric.model_dump()
-            )
-            await session.merge(model)
-            await session.commit()
-    except Exception as e:
-        logger.warning(f"Could not persist rubric {rubric.id} to DB (stored in memory): {e}")
+        payload = jwt.decode(token, config.JWT_SECRET, algorithms=["HS256"])
+        return {"username": payload.get("sub")}
+    except (JWTError, Exception):
+        return None
 
-    return rubric
+
+# In-memory store for fast lookup and fallback
+_rubrics: Dict[str, Rubric] = {}
 
 
 @router.get("")
-async def list_rubrics(current_user: dict = Depends(get_current_user)):
+async def list_rubrics(current_user: Optional[Dict[str, Any]] = Depends(get_optional_user)) -> List[Rubric]:
     rubric_map = dict(_rubrics)
     try:
         async with AsyncSessionLocal() as session:
-            result = await session.execute(select(RubricModel))
-            for row in result.scalars().all():
-                rubric_map[row.id] = Rubric.model_validate(row.data)
+            stmt = select(RubricModel)
+            db_rubrics = (await session.execute(stmt)).scalars().all()
+            for r in db_rubrics:
+                if r.data:
+                    rubric_map[r.id] = Rubric.model_validate(r.data)
     except Exception as e:
         logger.warning(f"Could not query DB for rubrics list: {e}")
 
-    # If completely empty, load fixture so user has at least one starting rubric
+    # Ensure at least the default rubric is present if empty
     if not rubric_map:
-        fixture_path = Path(__file__).parents[4] / "tests" / "fixtures" / "rubrics" / "rubric.json"
-        if fixture_path.exists():
-            with open(fixture_path) as f:
-                fix_r = Rubric.model_validate(json.load(f))
-                rubric_map[fix_r.id] = fix_r
+        try:
+            fixture_path = Path(__file__).parents[4] / "tests" / "fixtures" / "rubrics" / "rubric.json"
+            if fixture_path.exists():
+                with open(fixture_path, encoding="utf-8") as f:
+                    default_rubric = Rubric.model_validate(json.load(f))
+                    rubric_map[default_rubric.id] = default_rubric
+        except Exception:
+            pass
 
     return list(rubric_map.values())
 
 
+@router.post("")
+async def create_rubric(
+    payload: Union[Rubric, Dict[str, Any]] = Body(...),
+    current_user: Optional[Dict[str, Any]] = Depends(get_optional_user)
+) -> Rubric:
+    if isinstance(payload, dict):
+        rubric_id = payload.get("id") or f"r_{uuid.uuid4().hex[:8]}"
+        title = payload.get("title", "Untitled Rubric")
+        raw_criteria = payload.get("criteria", [])
+        criteria = [Criterion.model_validate(c) for c in raw_criteria]
+
+        if "credit_map" in payload and isinstance(payload["credit_map"], dict):
+            credit_map = CreditMap.model_validate(payload["credit_map"])
+        else:
+            credit_map = CreditMap()
+
+        total_weight = sum(c.weight for c in criteria)
+        max_score = float(payload.get("max_score") or total_weight)
+        if abs(total_weight - max_score) > 1e-4:
+            max_score = total_weight
+
+        rubric = Rubric(
+            id=rubric_id,
+            title=title,
+            criteria=criteria,
+            credit_map=credit_map,
+            max_score=max_score,
+        )
+    else:
+        rubric = payload
+
+    _rubrics[rubric.id] = rubric
+    try:
+        async with AsyncSessionLocal() as session:
+            model = RubricModel(id=rubric.id, title=rubric.title, data=rubric.model_dump())
+            await session.merge(model)
+            await session.commit()
+    except Exception as e:
+        logger.warning(f"Could not persist rubric {rubric.id} to DB: {e}")
+
+    return rubric
+
+
 @router.get("/{rubric_id}")
-async def get_rubric(rubric_id: str, current_user: dict = Depends(get_current_user)):
+async def get_rubric(
+    rubric_id: str,
+    current_user: Optional[Dict[str, Any]] = Depends(get_optional_user)
+) -> Rubric:
     try:
         async with AsyncSessionLocal() as session:
             res = await session.execute(select(RubricModel).where(RubricModel.id == rubric_id))
             row = res.scalar_one_or_none()
-            if row:
-                return Rubric.model_validate(row.data)
+            if row and row.data:
+                rubric = Rubric.model_validate(row.data)
+                _rubrics[rubric_id] = rubric
+                return rubric
     except Exception as e:
         logger.warning(f"Could not query DB for rubric {rubric_id}: {e}")
 
     if rubric_id in _rubrics:
         return _rubrics[rubric_id]
 
-    # Return fixture only if requested id matches fixture id (for test convenience)
-    fixture_path = Path(__file__).parents[4] / "tests" / "fixtures" / "rubrics" / "rubric.json"
-    if fixture_path.exists():
-        with open(fixture_path) as f:
-            fix_data = json.load(f)
-            if fix_data.get("id") == rubric_id:
-                return Rubric.model_validate(fix_data)
+    try:
+        fixture_path = Path(__file__).parents[4] / "tests" / "fixtures" / "rubrics" / "rubric.json"
+        if fixture_path.exists():
+            with open(fixture_path, encoding="utf-8") as f:
+                fix_data = json.load(f)
+                if fix_data.get("id") == rubric_id:
+                    return Rubric.model_validate(fix_data)
+    except Exception:
+        pass
 
     raise HTTPException(status_code=404, detail="Rubric not found")
 
 
 @router.delete("/{rubric_id}")
-async def delete_rubric(rubric_id: str, current_user: dict = Depends(get_current_user)):
+async def delete_rubric(
+    rubric_id: str,
+    current_user: Optional[Dict[str, Any]] = Depends(get_optional_user)
+):
     found = False
     if rubric_id in _rubrics:
         del _rubrics[rubric_id]

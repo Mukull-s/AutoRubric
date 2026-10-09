@@ -278,6 +278,8 @@ def node_evaluate(state: PipelineState):
         eval_pairs_dict.append({
             "prop_id": cand.prop_id,
             "criterion_id": cand.criterion_id,
+            "proposition_text": p_text,
+            "criterion_text": c_text,
             "similarity": cand.similarity
         })
         from autorubric.contracts import EvalPair

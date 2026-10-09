@@ -1,7 +1,7 @@
 import json
 from pathlib import Path
 from autorubric.contracts import (
-    Token, Proposition, Candidate, Rubric, Classification,
+    Token, Proposition, Candidate, Rubric, Classification, EvalPair,
     CriticVerdict, ScoreResult, JobStatus
 )
 from autorubric.pipeline.state import PipelineState
@@ -66,7 +66,19 @@ def test_evaluator_conformance():
     props = segment(tokens)
     candidates = match(props, rubric)
     
-    classifications = classify(candidates)
+    prop_map = {p.id: p for p in props}
+    criterion_map = {c.id: c for c in rubric.criteria}
+    pairs = [
+        EvalPair(
+            prop_id=c.prop_id,
+            criterion_id=c.criterion_id,
+            proposition_text=prop_map[c.prop_id].text,
+            criterion_text=criterion_map[c.criterion_id].description,
+            similarity=c.similarity,
+        )
+        for c in candidates
+    ]
+    classifications = classify(pairs)
     assert isinstance(classifications, list)
     assert all(isinstance(c, Classification) for c in classifications)
     
@@ -83,7 +95,19 @@ def test_scorer_conformance():
     tokens = extract(load_pdf_fixture())
     props = segment(tokens)
     candidates = match(props, rubric)
-    classifications = classify(candidates)
+    prop_map = {p.id: p for p in props}
+    criterion_map = {c.id: c for c in rubric.criteria}
+    pairs = [
+        EvalPair(
+            prop_id=c.prop_id,
+            criterion_id=c.criterion_id,
+            proposition_text=prop_map[c.prop_id].text,
+            criterion_text=criterion_map[c.criterion_id].description,
+            similarity=c.similarity,
+        )
+        for c in candidates
+    ]
+    classifications = classify(pairs)
     
     score_result = score(classifications, rubric, [])
     assert isinstance(score_result, ScoreResult)
@@ -99,7 +123,19 @@ def test_annotation_conformance():
     tokens = extract(pdf_bytes)
     props = segment(tokens)
     candidates = match(props, rubric)
-    classifications = classify(candidates)
+    prop_map = {p.id: p for p in props}
+    criterion_map = {c.id: c for c in rubric.criteria}
+    pairs = [
+        EvalPair(
+            prop_id=c.prop_id,
+            criterion_id=c.criterion_id,
+            proposition_text=prop_map[c.prop_id].text,
+            criterion_text=criterion_map[c.criterion_id].description,
+            similarity=c.similarity,
+        )
+        for c in candidates
+    ]
+    classifications = classify(pairs)
     score_result = score(classifications, rubric, [])
     pdf = annotate(pdf_bytes, score_result)
     assert isinstance(pdf, bytes)

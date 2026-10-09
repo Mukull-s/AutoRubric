@@ -18,7 +18,7 @@ export default function ResultPage() {
 
   const { data: result, isLoading, error } = useQuery({
     queryKey: ['result', docId],
-    queryFn: () => getResult(docId) as Promise<{ rubric_id: string, total: number, max_total: number, needs_review: boolean, review_reasons?: string[], per_criterion?: { criterion_id: string, label: string, marks: number, credit: number, capped?: boolean, trusted: boolean, flags: { code: string, reason: string }[], evidence_bboxes: { page: number, x: number, y: number }[] }[] }>,
+    queryFn: () => getResult(docId) as Promise<{ rubric_id: string, total: number, max_total: number, needs_review: boolean, review_reasons?: string[], provenance?: { evaluator?: { display_name?: string, backend?: string }, fixture_data_used?: boolean }, per_criterion?: { criterion_id: string, label: string, marks: number, credit: number, capped?: boolean, trusted: boolean, flags: { code: string, reason: string }[], evidence_bboxes: { page: number, x: number, y: number }[] }[] }>,
   });
 
   const verifyMutation = useMutation({
@@ -62,6 +62,12 @@ export default function ResultPage() {
             <div className="text-[11px] font-semibold uppercase tracking-wider text-zinc-400 mt-1">Total Score</div>
           </div>
         </div>
+        {result.provenance && (
+          <div className={`mt-5 rounded-xl px-4 py-3 text-xs ${result.provenance.fixture_data_used || result.provenance.evaluator?.backend === 'mock' ? 'bg-amber-500/10 text-amber-900' : 'bg-emerald-500/10 text-emerald-900'}`}>
+            Evaluator: {result.provenance.evaluator?.display_name || result.provenance.evaluator?.backend || 'unknown'}
+            {(result.provenance.fixture_data_used || result.provenance.evaluator?.backend === 'mock') && ' — Demo or heuristic mode: results are not from the trained model.'}
+          </div>
+        )}
 
         {result.needs_review && (
           <div className="my-6 p-4 rounded-2xl bg-amber-500/10 border border-amber-500/20 text-amber-800 text-xs flex gap-3">

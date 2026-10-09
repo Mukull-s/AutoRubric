@@ -21,9 +21,13 @@ dependencies = [
     "python-jose[cryptography]",
     "passlib[bcrypt]",
     "bcrypt<4.0.0",
-    "pymupdf"
+    "pymupdf",
+    "networkx",
+    "numpy",
+    "python-dotenv"
 ]
 requires-python = ">=3.11"
+
 
 [project.optional-dependencies]
 extraction = ["pymupdf", "paddleocr"]

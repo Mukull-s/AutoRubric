@@ -5,7 +5,7 @@ import { usePathname } from "next/navigation";
 import { useAuth } from "@/hooks/useAuth";
 
 export function Navigation() {
-  const { token, doLogout } = useAuth();
+  const { token, user, doLogout } = useAuth();
   const pathname = usePathname();
 
   if (pathname === '/login') return null;
@@ -52,6 +52,11 @@ export function Navigation() {
 
         {token && (
           <div className="flex items-center gap-3">
+            {user && (
+              <span className="text-xs font-medium text-zinc-600">
+                {user.full_name || user.email}
+              </span>
+            )}
             <button 
               onClick={doLogout} 
               className="text-xs font-medium text-zinc-500 hover:text-zinc-900 px-3 py-1.5 rounded-full hover:bg-black/[0.04] transition-colors"
