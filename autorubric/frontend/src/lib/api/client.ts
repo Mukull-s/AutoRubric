@@ -33,10 +33,20 @@ export async function apiClient<T>(
   });
 
   if (response.status === 401) {
-    if (typeof window !== 'undefined') {
-      window.location.href = "/login";
+    let message = "Unauthorized";
+    try {
+      const errJson = await response.json();
+      message = errJson.detail || message;
+    } catch {}
+
+    if (endpoint !== "/auth/login" && endpoint !== "/auth/register") {
+      if (typeof window !== 'undefined') {
+        localStorage.removeItem("token");
+        sessionStorage.removeItem("token");
+        window.location.href = "/login";
+      }
     }
-    throw new ApiError("Unauthorized", 401);
+    throw new ApiError(message, 401);
   }
 
   if (!response.ok) {

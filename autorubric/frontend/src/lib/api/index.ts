@@ -61,24 +61,48 @@ export async function getJob(jobId: string): Promise<Job> {
 }
 
 export async function submitSingle(formData: FormData): Promise<{ job_id: string, status: string }> {
-  const token = localStorage.getItem('token') || sessionStorage.getItem('token');
+  const token = typeof window !== 'undefined' ? (localStorage.getItem('token') || sessionStorage.getItem('token')) : null;
+  if (!token) {
+    if (typeof window !== 'undefined') window.location.href = '/login';
+    throw new Error('Please sign in before submitting assignments.');
+  }
   const res = await fetch(`${API_URL}/submissions`, {
     method: 'POST',
     headers: { 'Authorization': `Bearer ${token}` },
     body: formData,
   });
-  if (!res.ok) throw new Error(await res.text());
+  if (!res.ok) {
+    const errorText = await res.text();
+    let msg = errorText;
+    try {
+      const parsed = JSON.parse(errorText);
+      msg = parsed.detail || parsed.message || errorText;
+    } catch {}
+    throw new Error(msg);
+  }
   return res.json();
 }
 
 export async function submitBatch(formData: FormData): Promise<{ cohort_id: string, jobs: { job_id: string, file_name: string }[] }> {
-  const token = localStorage.getItem('token') || sessionStorage.getItem('token');
+  const token = typeof window !== 'undefined' ? (localStorage.getItem('token') || sessionStorage.getItem('token')) : null;
+  if (!token) {
+    if (typeof window !== 'undefined') window.location.href = '/login';
+    throw new Error('Please sign in before submitting assignments.');
+  }
   const res = await fetch(`${API_URL}/submissions/batch`, {
     method: 'POST',
     headers: { 'Authorization': `Bearer ${token}` },
     body: formData,
   });
-  if (!res.ok) throw new Error(await res.text());
+  if (!res.ok) {
+    const errorText = await res.text();
+    let msg = errorText;
+    try {
+      const parsed = JSON.parse(errorText);
+      msg = parsed.detail || parsed.message || errorText;
+    } catch {}
+    throw new Error(msg);
+  }
   return res.json();
 }
 

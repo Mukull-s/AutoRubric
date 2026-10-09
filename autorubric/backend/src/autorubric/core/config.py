@@ -17,6 +17,10 @@ for p in _possible_env_paths:
 
 def _normalize_db_url(url: str) -> str:
     url = url.strip()
+    # Supabase direct host db.<ref>.supabase.co is IPv6-only. Rewrite to IPv4 session pooler for Render/cloud IPv4 compatibility
+    if "db.tvdrnhqucrigclqbzvyq.supabase.co" in url:
+        url = url.replace("db.tvdrnhqucrigclqbzvyq.supabase.co", "aws-0-ap-northeast-1.pooler.supabase.com")
+        url = url.replace("://postgres:", "://postgres.tvdrnhqucrigclqbzvyq:")
     if url.startswith("postgres://"):
         return "postgresql+asyncpg://" + url[len("postgres://"):]
     elif url.startswith("postgresql://") and not url.startswith("postgresql+asyncpg://"):

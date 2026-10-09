@@ -2,14 +2,17 @@
 
 import { useState, useRef } from 'react';
 import { useRouter } from 'next/navigation';
+import Link from 'next/link';
 import { useQuery, useMutation } from '@tanstack/react-query';
 import { getRubrics, submitSingle, submitBatch } from '@/lib/api';
+import { useAuth } from '@/hooks/useAuth';
 import { UploadCloud, FileText, X, ArrowUpRight } from 'lucide-react';
 
 const MAX_SIZE = 10 * 1024 * 1024; // 10MB
 
 export default function UploadPage() {
   const router = useRouter();
+  const { token } = useAuth();
   const fileInputRef = useRef<HTMLInputElement>(null);
   
   const [files, setFiles] = useState<File[]>([]);
@@ -58,6 +61,10 @@ export default function UploadPage() {
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
+    if (!token) {
+      router.push('/login');
+      return;
+    }
     if (files.length === 0) {
       setError('Please select at least one PDF file');
       return;
@@ -93,6 +100,15 @@ export default function UploadPage() {
           <h1 className="text-2xl font-semibold tracking-tight text-zinc-900">Upload Submissions</h1>
           <p className="text-xs text-zinc-500 mt-1">Select an active rubric and upload student PDF assignments for autonomous grading.</p>
         </div>
+
+        {!token && (
+          <div className="mb-6 p-4 rounded-2xl bg-blue-500/10 border border-blue-500/20 text-blue-700 text-xs font-medium flex items-center justify-between">
+            <span>You must be signed in to submit assignments.</span>
+            <Link href="/login" className="underline font-semibold ml-2 hover:text-blue-900 flex items-center gap-1">
+              Sign in <ArrowUpRight className="w-3 h-3" />
+            </Link>
+          </div>
+        )}
 
         {error && (
           <div className="mb-6 p-3.5 rounded-2xl bg-red-500/10 border border-red-500/20 text-red-600 text-xs font-medium">

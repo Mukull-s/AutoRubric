@@ -91,20 +91,36 @@ allowed_origins = [
     "http://localhost:8000",
     "http://127.0.0.1:3000",
     "http://127.0.0.1:8000",
+    "https://auto-rubric.vercel.app",
 ]
 if cors_origins_env:
     for o in cors_origins_env.split(","):
-        if o.strip():
+        if o.strip() and o.strip() not in allowed_origins:
             allowed_origins.append(o.strip())
 
 app.add_middleware(
     CORSMiddleware,
     allow_origins=allowed_origins,
-    allow_origin_regex=r"https://.*(\.vercel\.app|\.onrender\.com)",
+    allow_origin_regex=r"https://.*(\.vercel\.app|\.onrender\.com.*)",
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+from fastapi.responses import JSONResponse
+from fastapi import Request, Response
+
+@app.exception_handler(Exception)
+async def global_exception_handler(request: Request, exc: Exception):
+    logger.error(f"Global unhandled error on {request.method} {request.url.path}: {exc}", exc_info=True)
+    return JSONResponse(
+        status_code=500,
+        content={"detail": "Internal server error", "error": str(exc)},
+    )
+
+@app.get("/favicon.ico", include_in_schema=False)
+async def favicon():
+    return Response(status_code=204)
 
 app.include_router(auth.router, prefix="/auth", tags=["auth"])
 app.include_router(rubrics.router, prefix="/rubrics", tags=["rubrics"])
