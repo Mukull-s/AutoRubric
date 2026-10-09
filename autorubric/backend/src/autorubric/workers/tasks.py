@@ -3,6 +3,7 @@ from autorubric.pipeline.graph import build_graph
 from autorubric.contracts import JobStatus, Rubric
 from autorubric.core.errors import TransientError, PermanentError
 import traceback
+import os
 
 import asyncio
 import concurrent.futures
@@ -55,10 +56,25 @@ def run_pipeline(self, job_id: str, rubric_dict: dict, pdf_bytes_hex: str):
                 async with AsyncSessionLocal() as session:
                     score_res = result.get("score")
                     if score_res:
+                        from autorubric.evaluator import model_info
+                        stage_modes = {
+                            "extraction": os.environ.get("STAGE_EXTRACTION_MODE", "real"),
+                            "segmentation": os.environ.get("STAGE_SEGMENTATION_MODE", "real"),
+                            "retrieval": os.environ.get("STAGE_RETRIEVAL_MODE", "real"),
+                            "evaluation": os.environ.get("STAGE_EVALUATION_MODE", "real"),
+                            "audit": os.environ.get("STAGE_AUDIT_MODE", "real"),
+                            "annotation": os.environ.get("STAGE_ANNOTATION_MODE", "real"),
+                        }
+                        score_data = score_res.model_dump()
+                        score_data["provenance"] = {
+                            "evaluator": model_info(),
+                            "stage_modes": stage_modes,
+                            "fixture_data_used": any(mode == "stub" for mode in stage_modes.values()),
+                        }
                         res = DBResult(
                             doc_id=job_id,
                             rubric_id=rubric.id if hasattr(rubric, "id") else "unknown",
-                            data=score_res.model_dump(),
+                            data=score_data,
                             total_score=score_res.total_score,
                             needs_review=score_res.needs_review,
                             audit_bundle=result.get("audit_bundle")
@@ -109,8 +125,7 @@ def run_pipeline(self, job_id: str, rubric_dict: dict, pdf_bytes_hex: str):
 @celery_app.task(bind=True, queue="gpu_queue")
 def evaluate_task(self, candidates_json: list[dict]):
     from autorubric.evaluator import classify
-    from autorubric.contracts import Candidate
-    candidates = [Candidate.model_validate(c) for c in candidates_json]
-    classifications = classify(candidates)
+    from autorubric.contracts import EvalPair
+    pairs = [EvalPair.model_validate(c) for c in candidates_json]
+    classifications = classify(pairs)
     return [c.model_dump() for c in classifications]
-

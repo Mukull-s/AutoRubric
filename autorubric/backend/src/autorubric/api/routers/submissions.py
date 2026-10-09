@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, File, UploadFile, Form, HTTPException, BackgroundTasks
+from fastapi import APIRouter, Depends, File, UploadFile, Form, HTTPException
 from typing import Annotated, Optional
 import uuid
 import os
@@ -48,46 +48,22 @@ async def process_upload(file: UploadFile, rubric_id: str, cohort_id: Optional[s
     with open(file_path, "wb") as f:
         f.write(content)
         
-    rubric_dict = None
-    async with AsyncSessionLocal() as session:
-        sub = Submission(id=doc_id, filename=file.filename or "unknown.pdf", rubric_id=rubric_id, cohort_id=cohort_id)
-        job = Job(id=job_id, submission_id=doc_id, status=JobStatus.QUEUED)
-        session.add(sub)
-        session.add(job)
-        await session.commit()
-        
-        from autorubric.core.db import RubricModel
-        r_model = await session.get(RubricModel, rubric_id)
-        if r_model and r_model.data:
+    from autorubric.core.db import RubricModel
+    try:
+        async with AsyncSessionLocal() as session:
+            r_model = await session.get(RubricModel, rubric_id)
+            if not r_model or not r_model.data:
+                raise HTTPException(status_code=404, detail=f"Rubric '{rubric_id}' not found")
             rubric_dict = r_model.data
-
-    if not rubric_dict:
-        try:
-            import json
-            from pathlib import Path
-            fixture_path = Path(__file__).parents[4] / "tests" / "fixtures" / "rubrics" / "rubric.json"
-            if fixture_path.exists():
-                with open(fixture_path) as f:
-                    rubric_dict = json.load(f)
-        except Exception:
-            pass
-
-    if not rubric_dict:
-        rubric_dict = {
-            "id": rubric_id or "r1",
-            "title": "Default Evaluation Rubric",
-            "criteria": [
-                {"id": "c1", "description": "Mentions primary claim and reasoning", "weight": 1.0, "depends_on": []},
-                {"id": "c2", "description": "Provides supporting evidence or details", "weight": 1.0, "depends_on": ["c1"]}
-            ],
-            "credit_map": {
-                "FULL_CREDIT": 1.0,
-                "PARTIAL_CREDIT": 0.5,
-                "NO_CREDIT": 0.0,
-                "MISCONCEPTION": 0.0
-            },
-            "max_score": 2.0
-        }
+            sub = Submission(id=doc_id, filename=file.filename or "unknown.pdf", rubric_id=rubric_id, cohort_id=cohort_id)
+            job = Job(id=job_id, submission_id=doc_id, status=JobStatus.QUEUED)
+            session.add(sub)
+            session.add(job)
+            await session.commit()
+    except HTTPException:
+        raise
+    except Exception as exc:
+        raise HTTPException(status_code=503, detail=f"Rubric storage is unavailable: {exc}") from exc
         
     run_pipeline.delay(job_id, rubric_dict, content.hex())
     

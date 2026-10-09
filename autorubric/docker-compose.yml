@@ -12,6 +12,15 @@ services:
       - REDIS_URL=redis://redis:6379/0
       - ADMIN_USER=admin
       - ADMIN_PASS=admin
+      - EVALUATOR_BACKEND=${EVALUATOR_BACKEND:-mock}
+      - EVALUATOR_ALLOW_MOCK_FALLBACK=${EVALUATOR_ALLOW_MOCK_FALLBACK:-false}
+      - ALLOW_MOCK_EVALUATOR=${ALLOW_MOCK_EVALUATOR:-true}
+      - STAGE_EXTRACTION_MODE=${STAGE_EXTRACTION_MODE:-real}
+      - STAGE_SEGMENTATION_MODE=${STAGE_SEGMENTATION_MODE:-real}
+      - STAGE_RETRIEVAL_MODE=${STAGE_RETRIEVAL_MODE:-real}
+      - STAGE_EVALUATION_MODE=${STAGE_EVALUATION_MODE:-real}
+      - STAGE_AUDIT_MODE=${STAGE_AUDIT_MODE:-real}
+      - STAGE_ANNOTATION_MODE=${STAGE_ANNOTATION_MODE:-real}
     depends_on:
       - postgres
       - redis
@@ -28,6 +37,15 @@ services:
     environment:
       - DATABASE_URL=postgresql+asyncpg://postgres:postgres@postgres:5432/autorubric
       - REDIS_URL=redis://redis:6379/0
+      - EVALUATOR_BACKEND=${EVALUATOR_BACKEND:-mock}
+      - EVALUATOR_ALLOW_MOCK_FALLBACK=${EVALUATOR_ALLOW_MOCK_FALLBACK:-false}
+      - ALLOW_MOCK_EVALUATOR=${ALLOW_MOCK_EVALUATOR:-true}
+      - STAGE_EXTRACTION_MODE=${STAGE_EXTRACTION_MODE:-real}
+      - STAGE_SEGMENTATION_MODE=${STAGE_SEGMENTATION_MODE:-real}
+      - STAGE_RETRIEVAL_MODE=${STAGE_RETRIEVAL_MODE:-real}
+      - STAGE_EVALUATION_MODE=${STAGE_EVALUATION_MODE:-real}
+      - STAGE_AUDIT_MODE=${STAGE_AUDIT_MODE:-real}
+      - STAGE_ANNOTATION_MODE=${STAGE_ANNOTATION_MODE:-real}
     depends_on:
       - redis
     volumes:
@@ -44,6 +62,15 @@ services:
     environment:
       - DATABASE_URL=postgresql+asyncpg://postgres:postgres@postgres:5432/autorubric
       - REDIS_URL=redis://redis:6379/0
+      - EVALUATOR_BACKEND=${EVALUATOR_BACKEND:-mock}
+      - EVALUATOR_ALLOW_MOCK_FALLBACK=${EVALUATOR_ALLOW_MOCK_FALLBACK:-false}
+      - ALLOW_MOCK_EVALUATOR=${ALLOW_MOCK_EVALUATOR:-true}
+      - STAGE_EXTRACTION_MODE=${STAGE_EXTRACTION_MODE:-real}
+      - STAGE_SEGMENTATION_MODE=${STAGE_SEGMENTATION_MODE:-real}
+      - STAGE_RETRIEVAL_MODE=${STAGE_RETRIEVAL_MODE:-real}
+      - STAGE_EVALUATION_MODE=${STAGE_EVALUATION_MODE:-real}
+      - STAGE_AUDIT_MODE=${STAGE_AUDIT_MODE:-real}
+      - STAGE_ANNOTATION_MODE=${STAGE_ANNOTATION_MODE:-real}
     depends_on:
       - redis
     volumes:

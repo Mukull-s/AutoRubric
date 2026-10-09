@@ -8,6 +8,7 @@ from sqlalchemy import text
 from autorubric.core.db import AsyncSessionLocal, engine, Base
 import redis.asyncio as redis
 import os
+from autorubric.evaluator import model_info
 
 logger = logging.getLogger(__name__)
 
@@ -87,5 +88,28 @@ async def health_ready():
         if not allow_fallback and not os.path.exists("/app/models") and not os.path.exists("../models"):
             return {"status": "unhealthy", "reason": "Model files missing"}
             
-    return {"status": "ready"}
-
+    return {
+        "status": "ready",
+        "provenance": {
+            "evaluator": model_info(),
+            "stage_modes": {
+                "extraction": config.STAGE_EXTRACTION_MODE,
+                "segmentation": config.STAGE_SEGMENTATION_MODE,
+                "retrieval": config.STAGE_RETRIEVAL_MODE,
+                "evaluation": config.STAGE_EVALUATION_MODE,
+                "audit": config.STAGE_AUDIT_MODE,
+                "annotation": config.STAGE_ANNOTATION_MODE,
+            },
+            "fixture_data_used": any(
+                mode == "stub"
+                for mode in (
+                    config.STAGE_EXTRACTION_MODE,
+                    config.STAGE_SEGMENTATION_MODE,
+                    config.STAGE_RETRIEVAL_MODE,
+                    config.STAGE_EVALUATION_MODE,
+                    config.STAGE_AUDIT_MODE,
+                    config.STAGE_ANNOTATION_MODE,
+                )
+            ),
+        },
+    }
