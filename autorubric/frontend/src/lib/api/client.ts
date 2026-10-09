@@ -16,7 +16,7 @@ export async function apiClient<T>(
   endpoint: string,
   options: RequestInit = {}
 ): Promise<T> {
-  const token = typeof window !== 'undefined' ? localStorage.getItem("token") : null;
+  const token = typeof window !== 'undefined' ? (localStorage.getItem("token") || sessionStorage.getItem("token")) : null;
   const headers = new Headers(options.headers || {});
   
   if (token) {
