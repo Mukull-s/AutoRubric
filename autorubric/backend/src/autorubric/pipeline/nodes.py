@@ -187,11 +187,11 @@ def node_evaluate(state: PipelineState):
             if state.get("pdf_bytes"):
                 try:
                     doc = fitz.open(stream=state["pdf_bytes"], filetype="pdf")
-                    full_text = "\n".join(page.get_text() for page in doc)
+                    full_text = "\n".join(page.get_text() for page in doc).strip()
                 except Exception:
                     pass
             if not full_text and state.get("tokens"):
-                full_text = " ".join(t.text for t in state["tokens"])
+                full_text = " ".join(t.text for t in state["tokens"]).strip()
 
             groq_evals = _run_sync(evaluate_submission_with_groq(full_text, state["rubric"]))
             classifications = []
