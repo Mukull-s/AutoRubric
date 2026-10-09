@@ -22,6 +22,54 @@ def _run_sync(coro):
         return asyncio.run(coro)
 
 
+def execute_pipeline_sync(job_id: str, rubric_dict: dict, pdf_bytes: bytes, doc_id: str = None):
+    """Executes the pipeline synchronously and updates database job/result."""
+    target_doc_id = doc_id or job_id
+    graph = build_graph()
+    rubric = Rubric.model_validate(rubric_dict)
+    
+    initial_state = {
+        "doc_id": target_doc_id,
+        "rubric": rubric,
+        "pdf_bytes": pdf_bytes,
+        "status": JobStatus.QUEUED
+    }
+    
+    result = graph.invoke(initial_state)
+    
+    from autorubric.core.db import AsyncSessionLocal, Result as DBResult, Job
+    
+    async def save_final():
+        try:
+            async with AsyncSessionLocal() as session:
+                score_res = result.get("score")
+                if score_res:
+                    final_total = getattr(score_res, "total", getattr(score_res, "total_score", 0.0))
+                    res = DBResult(
+                        doc_id=target_doc_id,
+                        rubric_id=rubric.id if hasattr(rubric, "id") else "unknown",
+                        data=score_res.model_dump(),
+                        total_score=float(final_total),
+                        needs_review=score_res.needs_review,
+                        audit_bundle=result.get("audit_bundle")
+                    )
+                    await session.merge(res)
+                job = await session.get(Job, job_id)
+                if job:
+                    job.status = result["status"]
+                await session.commit()
+        except Exception as e:
+            import logging
+            logging.getLogger(__name__).warning(f"Error saving pipeline final result to DB: {e}")
+            
+    try:
+        _run_sync(save_final())
+    except Exception:
+        pass
+    
+    return {"status": result["status"]}
+
+
 @celery_app.task(
     bind=True,
     autoretry_for=(TransientError,),
@@ -34,65 +82,38 @@ def _run_sync(coro):
     acks_late=True,
     reject_on_worker_lost=True
 )
-def run_pipeline(self, job_id: str, rubric_dict: dict, pdf_bytes_hex: str):
+def run_pipeline(self, job_id: str, rubric_dict: dict, pdf_bytes_hex: str, doc_id: str = None):
     try:
-        graph = build_graph()
-        rubric = Rubric.model_validate(rubric_dict)
         pdf_bytes = bytes.fromhex(pdf_bytes_hex)
+        return execute_pipeline_sync(job_id, rubric_dict, pdf_bytes, doc_id=doc_id)
+    except TransientError as e:
+        raise
+    except Exception as e:
+        error_msg = str(e)
+        tb = traceback.format_exc()
+        print(f"FAILED JOB {job_id}: {error_msg}\n{tb}")
         
-        initial_state = {
-            "doc_id": job_id,
-            "rubric": rubric,
-            "pdf_bytes": pdf_bytes,
-            "status": JobStatus.QUEUED
-        }
+        from autorubric.core.db import AsyncSessionLocal, Job, FailedJob
+        import uuid
         
-        result = graph.invoke(initial_state)
-        
-        from autorubric.core.db import AsyncSessionLocal, Result as DBResult, Job
-        
-        async def save_final():
+        async def save_failure():
             try:
                 async with AsyncSessionLocal() as session:
-                    score_res = result.get("score")
-                    if score_res:
-                        from autorubric.evaluator import model_info
-                        stage_modes = {
-                            "extraction": os.environ.get("STAGE_EXTRACTION_MODE", "real"),
-                            "segmentation": os.environ.get("STAGE_SEGMENTATION_MODE", "real"),
-                            "retrieval": os.environ.get("STAGE_RETRIEVAL_MODE", "real"),
-                            "evaluation": os.environ.get("STAGE_EVALUATION_MODE", "real"),
-                            "audit": os.environ.get("STAGE_AUDIT_MODE", "real"),
-                            "annotation": os.environ.get("STAGE_ANNOTATION_MODE", "real"),
-                        }
-                        score_data = score_res.model_dump()
-                        score_data["provenance"] = {
-                            "evaluator": model_info(),
-                            "stage_modes": stage_modes,
-                            "fixture_data_used": any(mode == "stub" for mode in stage_modes.values()),
-                        }
-                        res = DBResult(
-                            doc_id=job_id,
-                            rubric_id=rubric.id if hasattr(rubric, "id") else "unknown",
-                            data=score_data,
-                            total_score=score_res.total_score,
-                            needs_review=score_res.needs_review,
-                            audit_bundle=result.get("audit_bundle")
-                        )
-                        session.add(res)
                     job = await session.get(Job, job_id)
                     if job:
-                        job.status = result["status"]
+                        job.status = JobStatus.FAILED
+                        job.error = error_msg
+                    failed = FailedJob(id=str(uuid.uuid4()), job_id=job_id, error=error_msg, traceback=tb)
+                    session.add(failed)
                     await session.commit()
             except Exception:
                 pass
                 
         try:
-            _run_sync(save_final())
+            _run_sync(save_failure())
         except Exception:
             pass
-        
-        return {"status": result["status"]}
+        return {"status": JobStatus.FAILED, "error": error_msg}
     except TransientError as e:
         raise
     except Exception as e:

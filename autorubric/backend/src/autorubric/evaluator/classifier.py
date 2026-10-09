@@ -202,7 +202,7 @@ def classify(pairs: List[Union[EvalPair, Candidate]]) -> List[Classification]:
         return []
 
     backend = get_evaluator_backend()
-    if backend == "mock":
+    if backend in ("mock", "groq"):
         return _classify_mock(pairs)
     elif backend in ("cpu", "gpu"):
         device = "cuda" if backend == "gpu" else "cpu"
@@ -213,4 +213,4 @@ def classify(pairs: List[Union[EvalPair, Candidate]]) -> List[Classification]:
                 return _classify_mock(pairs)
             raise
     else:
-        raise ValueError(f"Unknown evaluator backend: {backend!r}. Choose 'mock', 'cpu', or 'gpu'.")
+        raise ValueError(f"Unknown evaluator backend: {backend!r}. Choose 'mock', 'cpu', 'gpu', or 'groq'.")

@@ -1,26 +1,60 @@
 from sqlalchemy.orm import declarative_base
-from sqlalchemy import Column, String, Float, JSON, DateTime, Boolean, Enum
+from sqlalchemy import Column, String, Float, JSON, DateTime, Boolean, Enum, Index, func
 from sqlalchemy.dialects.postgresql import JSONB
 from autorubric.contracts import JobStatus
 import datetime
 import uuid
-from sqlalchemy import Column, String, Float, JSON, DateTime, Boolean, Enum, Index, func
+from sqlalchemy.types import TypeDecorator, CHAR
 from sqlalchemy.dialects.postgresql import JSONB, UUID
 
 from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession
 from sqlalchemy.orm import declarative_base, sessionmaker
 from autorubric.core.config import config
 
-engine = create_async_engine(config.DATABASE_URL, echo=False)
+class GUID(TypeDecorator):
+    """Platform-independent GUID type.
+    Uses PostgreSQL's UUID type, otherwise uses CHAR(36).
+    """
+    impl = CHAR
+    cache_ok = True
+
+    def load_dialect_impl(self, dialect):
+        if dialect.name == "postgresql":
+            return dialect.type_descriptor(UUID(as_uuid=True))
+        else:
+            return dialect.type_descriptor(CHAR(36))
+
+    def process_bind_param(self, value, dialect):
+        if value is None:
+            return value
+        elif dialect.name == "postgresql":
+            return str(value)
+        else:
+            return str(value)
+
+    def process_result_value(self, value, dialect):
+        if value is None:
+            return value
+        else:
+            if not isinstance(value, uuid.UUID):
+                try:
+                    return uuid.UUID(str(value))
+                except Exception:
+                    return value
+            return value
+
+connect_args = {"check_same_thread": False} if "sqlite" in config.DATABASE_URL else {}
+engine = create_async_engine(config.DATABASE_URL, echo=False, connect_args=connect_args)
 AsyncSessionLocal = sessionmaker(
     engine, class_=AsyncSession, expire_on_commit=False
 )
 
 Base = declarative_base()
+JSON_TYPE = JSON().with_variant(JSONB(), "postgresql")
 
 class User(Base):
     __tablename__ = "users"
-    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    id = Column(GUID(), primary_key=True, default=uuid.uuid4)
     email = Column(String, nullable=False)
     password_hash = Column(String, nullable=False)
     full_name = Column(String, nullable=True)
@@ -37,7 +71,7 @@ class RubricModel(Base):
     __tablename__ = "rubrics"
     id = Column(String, primary_key=True)
     title = Column(String, nullable=False)
-    data = Column(JSONB, nullable=False)
+    data = Column(JSON_TYPE, nullable=False)
 
 class Submission(Base):
     __tablename__ = "submissions"
@@ -71,7 +105,7 @@ class JobArtifact(Base):
     id = Column(String, primary_key=True)
     job_id = Column(String, nullable=False)
     stage = Column(String, nullable=False)
-    payload = Column(JSONB, nullable=False)
+    payload = Column(JSON_TYPE, nullable=False)
 
 class FailedJob(Base):
     __tablename__ = "failed_jobs"
@@ -85,13 +119,13 @@ class Result(Base):
     __tablename__ = "results"
     doc_id = Column(String, primary_key=True)
     rubric_id = Column(String, nullable=False)
-    data = Column(JSONB, nullable=False)
+    data = Column(JSON_TYPE, nullable=False)
     total_score = Column(Float, nullable=False)
     needs_review = Column(Boolean, default=False)
-    audit_bundle = Column(JSONB, nullable=True)
+    audit_bundle = Column(JSON_TYPE, nullable=True)
 
 class CollusionCache(Base):
     __tablename__ = "collusion_cache"
     cohort_id = Column(String, primary_key=True)
     doc_ids_hash = Column(String, nullable=False)
-    report = Column(JSONB, nullable=False)
+    report = Column(JSON_TYPE, nullable=False)

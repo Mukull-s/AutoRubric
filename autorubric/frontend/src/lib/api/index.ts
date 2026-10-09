@@ -50,6 +50,11 @@ export async function createRubric(data: CreateRubricRequest): Promise<Rubric> {
   });
 }
 
+export async function deleteRubric(id: string): Promise<{ status: string, message: string }> {
+  return apiClient<{ status: string, message: string }>(`/rubrics/${id}`, {
+    method: "DELETE",
+  });
+}
 
 export async function getJob(jobId: string): Promise<Job> {
   return apiClient<Job>(`/jobs/${jobId}`);

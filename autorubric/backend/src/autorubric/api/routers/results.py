@@ -46,7 +46,6 @@ class VerifyResponse(BaseModel):
 async def verify_result(doc_id: str, current_user: dict = Depends(get_current_user)):
     from autorubric.core.db import AsyncSessionLocal, Result
     from sqlalchemy import select
-    
     # Attempt verification using real stored audit bundle
     try:
         async with AsyncSessionLocal() as session:
@@ -60,9 +59,11 @@ async def verify_result(doc_id: str, current_user: dict = Depends(get_current_us
                 new_score.doc_id = doc_id
                 
                 diffs = []
-                orig_score = res.data.get("total_score", 0.0)
-                if abs(new_score.total_score - orig_score) > 1e-4:
-                    diffs.append(f"Score recalculation mismatch: {new_score.total_score} vs {orig_score}")
+                orig_score = getattr(res, "total_score", None)
+                if orig_score is None:
+                    orig_score = res.data.get("total", res.data.get("total_score", 0.0))
+                if abs(new_score.total - float(orig_score)) > 1e-4:
+                    diffs.append(f"Score recalculation mismatch: {new_score.total} vs {orig_score}")
                 return {"match": len(diffs) == 0, "differences": diffs}
     except Exception:
         pass

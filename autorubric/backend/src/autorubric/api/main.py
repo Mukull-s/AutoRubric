@@ -26,6 +26,16 @@ async def lifespan(app: FastAPI):
     logger.info(f"Stage Modes - Retrieval: {config.STAGE_RETRIEVAL_MODE}, Evaluation: {config.STAGE_EVALUATION_MODE}")
     logger.info(f"Stage Modes - Audit: {config.STAGE_AUDIT_MODE}, Annotation: {config.STAGE_ANNOTATION_MODE}")
     logger.info(f"Evaluator Backend: {config.EVALUATOR_BACKEND}")
+    
+    # Initialize DB schema if connection is available
+    try:
+        from autorubric.core.db import engine, Base
+        async with engine.begin() as conn:
+            await conn.run_sync(Base.metadata.create_all)
+        logger.info("Database schema verified/created successfully.")
+    except Exception as e:
+        logger.warning(f"Note: Database not reachable yet on startup: {e}")
+        
     yield
 
 app = FastAPI(title="AutoRubric API", lifespan=lifespan)
@@ -83,9 +93,9 @@ async def health_ready():
         return {"status": "unhealthy", "reason": f"Redis: {e}"}
         
     # Check model files
-    if config.EVALUATOR_BACKEND not in ("mock", "stub"):
+    if config.EVALUATOR_BACKEND in ("cpu", "gpu"):
         allow_fallback = os.environ.get("EVALUATOR_ALLOW_MOCK_FALLBACK", "false").lower() == "true"
-        if not allow_fallback and not os.path.exists("/app/models") and not os.path.exists("../models"):
+        if not allow_fallback and not os.path.exists("/app/models") and not os.path.exists("../models") and not os.path.exists("models"):
             return {"status": "unhealthy", "reason": "Model files missing"}
             
     return {

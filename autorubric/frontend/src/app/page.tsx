@@ -1,12 +1,36 @@
 'use client';
 
 import Link from "next/link";
-import { useQuery } from '@tanstack/react-query';
-import { getRubrics } from '@/lib/api';
-import { Plus, BookOpen, ChevronRight, Layers } from 'lucide-react';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { getRubrics, deleteRubric } from '@/lib/api';
+import { Plus, BookOpen, ChevronRight, Layers, Trash2 } from 'lucide-react';
+import { useState } from 'react';
 
 export default function DashboardPage() {
+  const queryClient = useQueryClient();
   const { data: rubrics, isLoading, error } = useQuery({ queryKey: ['rubrics'], queryFn: getRubrics });
+  const [deletingId, setDeletingId] = useState<string | null>(null);
+
+  const deleteMutation = useMutation({
+    mutationFn: (id: string) => deleteRubric(id),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['rubrics'] });
+      setDeletingId(null);
+    },
+    onError: (err: Error) => {
+      alert(`Failed to delete rubric: ${err.message}`);
+      setDeletingId(null);
+    }
+  });
+
+  const handleDelete = (id: string, title: string, e: React.MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    if (confirm(`Are you sure you want to delete the rubric "${title}"?`)) {
+      setDeletingId(id);
+      deleteMutation.mutate(id);
+    }
+  };
 
   return (
     <div className="max-w-5xl mx-auto py-4">
@@ -48,12 +72,11 @@ export default function DashboardPage() {
       {!isLoading && !error && (
         <div className="grid gap-3">
           {rubrics?.map((r) => (
-            <Link
+            <div
               key={r.id}
-              href={`/rubrics/${r.id}`}
               className="group flex items-center justify-between p-5 rounded-2xl glass-card-subtle hover:bg-white/90 hover:border-black/[0.1] hover:shadow-md transition-all duration-200"
             >
-              <div className="flex items-center gap-4">
+              <Link href={`/rubrics/${r.id}`} className="flex items-center gap-4 flex-1">
                 <div className="w-10 h-10 rounded-xl bg-black/[0.04] group-hover:bg-zinc-900 group-hover:text-white flex items-center justify-center text-zinc-600 transition-colors duration-200">
                   <BookOpen className="w-4 h-4 stroke-[2]" />
                 </div>
@@ -70,15 +93,26 @@ export default function DashboardPage() {
                     <span className="text-[11px] text-zinc-400">ID: {r.id}</span>
                   </div>
                 </div>
-              </div>
+              </Link>
 
               <div className="flex items-center gap-2">
-                <span className="text-xs text-zinc-400 group-hover:text-zinc-600 transition-colors hidden sm:inline">
-                  View
-                </span>
-                <ChevronRight className="w-4 h-4 text-zinc-400 group-hover:text-zinc-900 group-hover:translate-x-0.5 transition-all" />
+                <button
+                  onClick={(e) => handleDelete(r.id, r.title, e)}
+                  disabled={deletingId === r.id}
+                  title="Delete Rubric"
+                  className="p-2 rounded-xl text-zinc-400 hover:text-rose-600 hover:bg-rose-50 transition-colors disabled:opacity-50"
+                >
+                  <Trash2 className="w-4 h-4 stroke-[1.75]" />
+                </button>
+                <Link
+                  href={`/rubrics/${r.id}`}
+                  className="flex items-center gap-1 text-xs text-zinc-400 group-hover:text-zinc-600 transition-colors px-2 py-1"
+                >
+                  <span className="hidden sm:inline">View</span>
+                  <ChevronRight className="w-4 h-4 text-zinc-400 group-hover:text-zinc-900 group-hover:translate-x-0.5 transition-all" />
+                </Link>
               </div>
-            </Link>
+            </div>
           ))}
 
           {(!rubrics || rubrics.length === 0) && (

@@ -62,14 +62,33 @@ def extract(pdf_bytes: bytes) -> list[Token]:
         words.sort(key=lambda w: (w[5], w[6], w[7]))
         
         if not words:
-            # Check for OCR if enabled
-            if config.ocr_backend == "auto":
-                try:
-                    import paddleocr
-                    # Not fully implemented yet, just skip with warning
-                    print(f"Warning: Page {page_num} has no text layer, OCR not fully implemented.")
-                except ImportError:
-                    print(f"Warning: Page {page_num} has no text layer and paddleocr is not installed. Skipping.")
+            # Fallback to OCR for scanned / image-based pages
+            try:
+                from rapidocr_onnxruntime import RapidOCR
+                ocr_engine = RapidOCR()
+                pix = page.get_pixmap(dpi=150)
+                img_bytes = pix.tobytes("png")
+                ocr_results, _ = ocr_engine(img_bytes)
+                if ocr_results:
+                    scale_x = page_rect.width / pix.width
+                    scale_y = page_rect.height / pix.height
+                    
+                    ocr_words = []
+                    for idx, res in enumerate(ocr_results):
+                        box = res[0]
+                        txt = res[1]
+                        xs = [pt[0] * scale_x for pt in box]
+                        ys = [pt[1] * scale_y for pt in box]
+                        bx0, bx1 = min(xs), max(xs)
+                        by0, by1 = min(ys), max(ys)
+                        
+                        for widx, w in enumerate(txt.split()):
+                            ocr_words.append((bx0, by0, bx1, by1, w, idx, 0, widx))
+                    words = ocr_words
+            except Exception as e:
+                print(f"Warning: OCR extraction failed on page {page_num}: {e}")
+
+        if not words:
             continue
 
         traces = page.get_texttrace()
