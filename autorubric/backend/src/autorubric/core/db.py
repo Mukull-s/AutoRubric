@@ -43,8 +43,11 @@ class GUID(TypeDecorator):
                     return value
             return value
 
+from sqlalchemy.pool import NullPool
+
 connect_args = {"check_same_thread": False} if "sqlite" in config.DATABASE_URL else {}
-engine = create_async_engine(config.DATABASE_URL, echo=False, connect_args=connect_args)
+pool_kwargs = {"poolclass": NullPool} if "sqlite" not in config.DATABASE_URL else {}
+engine = create_async_engine(config.DATABASE_URL, echo=False, connect_args=connect_args, **pool_kwargs)
 AsyncSessionLocal = sessionmaker(
     engine, class_=AsyncSession, expire_on_commit=False
 )

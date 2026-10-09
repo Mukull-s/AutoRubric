@@ -63,15 +63,8 @@ async def process_upload(
             r_model = await session.get(RubricModel, rubric_id)
             if r_model and r_model.data:
                 rubric_dict = r_model.data
-            sub = Submission(id=doc_id, filename=file.filename or "unknown.pdf", rubric_id=rubric_id, cohort_id=cohort_id)
-            job = Job(id=job_id, submission_id=doc_id, status=JobStatus.QUEUED)
-            session.add(sub)
-            session.add(job)
-            await session.commit()
-    except HTTPException:
-        raise
     except Exception as e:
-        logger.warning(f"DB submission create warning: {e}")
+        logger.warning(f"Error fetching rubric from DB: {e}")
 
     if not rubric_dict:
         from .rubrics import _rubrics
@@ -89,7 +82,19 @@ async def process_upload(
     if not rubric_dict:
         raise HTTPException(status_code=404, detail=f"Rubric '{rubric_id}' not found")
 
-    # Execute pipeline asynchronously in background thread so it finishes immediately without needing a celery worker
+    # Persist submission and job
+    try:
+        async with AsyncSessionLocal() as session:
+            sub = Submission(id=doc_id, filename=file.filename or "unknown.pdf", rubric_id=rubric_id, cohort_id=cohort_id)
+            job = Job(id=job_id, submission_id=doc_id, status=JobStatus.QUEUED)
+            session.add(sub)
+            session.add(job)
+            await session.commit()
+    except Exception as e:
+        logger.error(f"Failed to persist submission/job in DB: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail="Failed to initialize submission job")
+
+    # Execute pipeline asynchronously
     def _safe_run():
         try:
             print(f"[PIPELINE] Starting pipeline execution for job: {job_id}")
@@ -99,8 +104,11 @@ async def process_upload(
             import traceback
             print(f"[PIPELINE ERROR] Failed job {job_id}: {e}\n{traceback.format_exc()}")
 
-    t = threading.Thread(target=_safe_run, daemon=True)
-    t.start()
+    if background_tasks is not None:
+        background_tasks.add_task(_safe_run)
+    else:
+        t = threading.Thread(target=_safe_run, daemon=False)
+        t.start()
     
     return {"filename": file.filename, "doc_id": doc_id, "job_id": job_id, "status": "QUEUED"}
 

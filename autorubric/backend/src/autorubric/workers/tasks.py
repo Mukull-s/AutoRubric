@@ -13,6 +13,16 @@ import concurrent.futures
 logger = logging.getLogger(__name__)
 
 
+import threading
+
+_thread_local = threading.local()
+
+def _get_thread_loop():
+    if not hasattr(_thread_local, "loop") or _thread_local.loop is None or _thread_local.loop.is_closed():
+        _thread_local.loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(_thread_local.loop)
+    return _thread_local.loop
+
 def _run_sync(coro):
     try:
         loop = asyncio.get_running_loop()
@@ -23,7 +33,7 @@ def _run_sync(coro):
         with concurrent.futures.ThreadPoolExecutor(max_workers=1) as pool:
             return pool.submit(asyncio.run, coro).result()
     else:
-        return asyncio.run(coro)
+        return _get_thread_loop().run_until_complete(coro)
 
 
 def execute_pipeline_sync(job_id: str, rubric_dict: dict, pdf_bytes: bytes, doc_id: str = None):

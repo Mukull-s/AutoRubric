@@ -16,6 +16,16 @@ import concurrent.futures
 from functools import wraps
 
 
+import threading
+
+_thread_local = threading.local()
+
+def _get_thread_loop():
+    if not hasattr(_thread_local, "loop") or _thread_local.loop is None or _thread_local.loop.is_closed():
+        _thread_local.loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(_thread_local.loop)
+    return _thread_local.loop
+
 def _run_sync(coro):
     """Run an async coroutine from sync code safely handling active event loops."""
     try:
@@ -27,7 +37,7 @@ def _run_sync(coro):
         with concurrent.futures.ThreadPoolExecutor(max_workers=1) as pool:
             return pool.submit(asyncio.run, coro).result()
     else:
-        return asyncio.run(coro)
+        return _get_thread_loop().run_until_complete(coro)
 
 
 def track_stage(stage_name: str, new_status: JobStatus):
@@ -35,7 +45,8 @@ def track_stage(stage_name: str, new_status: JobStatus):
         @wraps(func)
         def wrapper(state: dict) -> dict:
             job_id = state.get("job_id") or state.get("doc_id", "unknown")
-            started_at = datetime.datetime.now(datetime.UTC)
+            utc_tz = getattr(datetime, "UTC", datetime.timezone.utc)
+            started_at = datetime.datetime.now(utc_tz)
             state["status"] = new_status
             
             from autorubric.core.db import AsyncSessionLocal, Job, JobEvent
