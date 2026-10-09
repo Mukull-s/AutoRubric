@@ -1,19 +1,40 @@
 'use client';
 
-import { useParams } from 'next/navigation';
-import { useQuery } from '@tanstack/react-query';
-import { getRubric } from '@/lib/api';
+import { useParams, useRouter } from 'next/navigation';
+import { useQuery, useMutation } from '@tanstack/react-query';
+import { getRubric, deleteRubric } from '@/lib/api';
 import Link from 'next/link';
-import { useMemo } from 'react';
+import { useMemo, useState } from 'react';
+import { Trash2 } from 'lucide-react';
 
 export default function RubricDetailPage() {
   const params = useParams();
+  const router = useRouter();
   const id = params.id as string;
+  const [isDeleting, setIsDeleting] = useState(false);
 
   const { data: rubric, isLoading, error } = useQuery({
     queryKey: ['rubric', id],
     queryFn: () => getRubric(id),
   });
+
+  const deleteMutation = useMutation({
+    mutationFn: () => deleteRubric(id),
+    onSuccess: () => {
+      router.push('/');
+    },
+    onError: (err: Error) => {
+      alert(`Failed to delete rubric: ${err.message}`);
+      setIsDeleting(false);
+    }
+  });
+
+  const handleDelete = () => {
+    if (confirm(`Are you sure you want to delete the rubric "${rubric?.title}"?`)) {
+      setIsDeleting(true);
+      deleteMutation.mutate();
+    }
+  };
 
   const svgGraph = useMemo(() => {
     if (!rubric || !rubric.criteria) return null;
@@ -66,7 +87,17 @@ export default function RubricDetailPage() {
   return (
     <div className="max-w-4xl mx-auto p-6 bg-white shadow rounded border">
       <Link href="/" className="text-blue-600 hover:underline mb-4 inline-block">&larr; Back to Dashboard</Link>
-      <h1 className="text-3xl font-bold mb-6">{rubric.title}</h1>
+      <div className="flex items-center justify-between mb-6 pb-4 border-b">
+        <h1 className="text-3xl font-bold">{rubric.title}</h1>
+        <button
+          onClick={handleDelete}
+          disabled={isDeleting}
+          className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-medium text-rose-600 bg-rose-50 hover:bg-rose-100 transition-colors disabled:opacity-50"
+        >
+          <Trash2 className="w-3.5 h-3.5" />
+          <span>{isDeleting ? "Deleting..." : "Delete Rubric"}</span>
+        </button>
+      </div>
       
       <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
         <div>

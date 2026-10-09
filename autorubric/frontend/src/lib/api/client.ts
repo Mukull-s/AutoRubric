@@ -43,7 +43,15 @@ export async function apiClient<T>(
     let details = null;
     try {
       const errorData = await response.json();
-      message = errorData.detail || message;
+      if (typeof errorData.detail === 'string') {
+        message = errorData.detail;
+      } else if (Array.isArray(errorData.detail)) {
+        message = errorData.detail.map((d: any) => d.msg || JSON.stringify(d)).join(", ");
+      } else if (errorData.detail && typeof errorData.detail === 'object') {
+        message = JSON.stringify(errorData.detail);
+      } else if (errorData.message) {
+        message = errorData.message;
+      }
       details = errorData;
     } catch {
       // Ignored

@@ -22,7 +22,8 @@ class Config:
     STAGE_AUDIT_MODE = os.environ.get("STAGE_AUDIT_MODE", "real")
     STAGE_ANNOTATION_MODE = os.environ.get("STAGE_ANNOTATION_MODE", "real")
     
-    EVALUATOR_BACKEND = os.environ.get("EVALUATOR_BACKEND", "cpu") # mock, cpu, gpu
+    EVALUATOR_BACKEND = os.environ.get("EVALUATOR_BACKEND", "groq") # mock, cpu, gpu, groq
+    GROQ_API_KEY = os.environ.get("GROQ_API_KEY", "")
     UPLOADS_DIR = os.environ.get("UPLOADS_DIR", "/app/uploads")
 
 

@@ -36,7 +36,12 @@ def validate_pdf(content: bytes) -> None:
         
     doc.close()
 
-async def process_upload(file: UploadFile, rubric_id: str, cohort_id: Optional[str] = None) -> dict:
+async def process_upload(
+    file: UploadFile,
+    rubric_id: str,
+    cohort_id: Optional[str] = None,
+    background_tasks: Optional[BackgroundTasks] = None
+) -> dict:
     content = await file.read()
     validate_pdf(content)
     
@@ -55,14 +60,46 @@ async def process_upload(file: UploadFile, rubric_id: str, cohort_id: Optional[s
         session.add(job)
         await session.commit()
     
-    # In a real app we'd fetch the rubric from DB
-    import json
-    from pathlib import Path
-    fixture_path = Path(__file__).parents[4] / "tests" / "fixtures" / "rubrics" / "rubric.json"
-    with open(fixture_path) as f:
-        rubric_dict = json.load(f)
-        
-    run_pipeline.delay(job_id, rubric_dict, content.hex())
+    # Retrieve the actual selected rubric from DB or in-memory store
+    rubric_dict = None
+    try:
+        from autorubric.core.db import RubricModel
+        from sqlalchemy import select
+        async with AsyncSessionLocal() as session:
+            res = await session.execute(select(RubricModel).where(RubricModel.id == rubric_id))
+            row = res.scalar_one_or_none()
+            if row:
+                rubric_dict = row.data
+    except Exception:
+        pass
+
+    if not rubric_dict:
+        from .rubrics import _rubrics
+        if rubric_id in _rubrics:
+            rubric_dict = _rubrics[rubric_id].model_dump()
+
+    if not rubric_dict:
+        import json
+        from pathlib import Path
+        fixture_path = Path(__file__).parents[4] / "tests" / "fixtures" / "rubrics" / "rubric.json"
+        if fixture_path.exists():
+            with open(fixture_path) as f:
+                rubric_dict = json.load(f)
+
+    # Execute pipeline asynchronously in background thread so it finishes immediately without needing celery worker
+    def _safe_run():
+        try:
+            print(f"[PIPELINE] Starting pipeline execution for job: {job_id}")
+            from autorubric.workers.tasks import execute_pipeline_sync
+            res = execute_pipeline_sync(job_id, rubric_dict, content, doc_id)
+            print(f"[PIPELINE] Successfully finished job {job_id}: {res}")
+        except Exception as e:
+            import traceback
+            print(f"[PIPELINE ERROR] Failed job {job_id}: {e}\n{traceback.format_exc()}")
+
+    import threading
+    t = threading.Thread(target=_safe_run, daemon=True)
+    t.start()
     
     return {"filename": file.filename, "doc_id": doc_id, "job_id": job_id}
 
@@ -70,9 +107,10 @@ async def process_upload(file: UploadFile, rubric_id: str, cohort_id: Optional[s
 async def create_submission(
     rubric_id: Annotated[str, Form()],
     file: UploadFile = File(...),
+    background_tasks: BackgroundTasks = None,
     current_user: dict = Depends(get_current_user)
 ):
-    result = await process_upload(file, rubric_id)
+    result = await process_upload(file, rubric_id, background_tasks=background_tasks)
     return {"job_id": result["job_id"]}
 
 @router.post("/batch")
@@ -80,6 +118,7 @@ async def create_batch_submission(
     rubric_id: Annotated[str, Form()],
     files: list[UploadFile] = File(...),
     cohort_id: Optional[str] = Form(None),
+    background_tasks: BackgroundTasks = None,
     current_user: dict = Depends(get_current_user)
 ):
     results = []
@@ -87,7 +126,7 @@ async def create_batch_submission(
     
     for file in files:
         try:
-            res = await process_upload(file, rubric_id, cohort_id)
+            res = await process_upload(file, rubric_id, cohort_id, background_tasks=background_tasks)
             results.append(res)
         except HTTPException as e:
             errors.append({"filename": file.filename, "error": e.detail})

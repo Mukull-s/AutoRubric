@@ -1,5 +1,4 @@
-from fastapi import APIRouter, Depends, HTTPException, status
-from fastapi.security import OAuth2PasswordRequestForm
+from fastapi import APIRouter, HTTPException, status, Request
 from autorubric.core.config import config
 from passlib.context import CryptContext
 from jose import jwt
@@ -19,14 +18,41 @@ def create_access_token(data: dict, expires_delta: timedelta | None = None):
     return encoded_jwt
 
 @router.post("/login")
-async def login(form_data: OAuth2PasswordRequestForm = Depends()):
-    if form_data.username == config.ADMIN_EMAIL:
-        if pwd_context.verify(form_data.password, config.ADMIN_PASSWORD_HASH):
+async def login(request: Request):
+    content_type = request.headers.get("content-type", "")
+    username = None
+    password = None
+
+    if "application/json" in content_type:
+        try:
+            body = await request.json()
+            if isinstance(body, dict):
+                username = body.get("username")
+                password = body.get("password")
+        except Exception:
+            pass
+    else:
+        try:
+            form = await request.form()
+            username = form.get("username")
+            password = form.get("password")
+        except Exception:
+            pass
+
+    if not username or not password:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Username and password required",
+        )
+
+    if username == config.ADMIN_EMAIL:
+        if pwd_context.verify(password, config.ADMIN_PASSWORD_HASH):
             access_token_expires = timedelta(minutes=config.ACCESS_TOKEN_EXPIRE_MINUTES)
             access_token = create_access_token(
-                data={"sub": form_data.username}, expires_delta=access_token_expires
+                data={"sub": username}, expires_delta=access_token_expires
             )
             return {"access_token": access_token, "token_type": "bearer"}
+
     raise HTTPException(
         status_code=status.HTTP_401_UNAUTHORIZED,
         detail="Incorrect username or password",

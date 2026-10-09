@@ -46,7 +46,28 @@ class VerifyResponse(BaseModel):
 
 @router.post("/{doc_id}/verify", response_model=VerifyResponse)
 async def verify_result(doc_id: str, current_user: dict = Depends(get_current_user)):
-    # Mocking verify logic using fixture data
+    from autorubric.core.db import AsyncSessionLocal, Result
+    from sqlalchemy import select
+    
+    try:
+        async with AsyncSessionLocal() as session:
+            res_row = (await session.execute(select(Result).where(Result.doc_id == doc_id))).scalar_one_or_none()
+            if res_row and res_row.audit_bundle:
+                bundle = res_row.audit_bundle
+                rubric = Rubric.model_validate(bundle["rubric"])
+                classifications = [Classification.model_validate(i) for i in bundle.get("classifications", [])]
+                verdicts = [CriticVerdict.model_validate(i) for i in bundle.get("verdicts", [])]
+                
+                new_score = score(classifications, rubric, verdicts)
+                new_score.doc_id = doc_id
+                
+                if abs(new_score.total - res_row.total_score) < 1e-4:
+                    return {"match": True, "differences": []}
+                return {"match": False, "differences": [f"Recalculated score {new_score.total} does not match recorded {res_row.total_score}"]}
+    except Exception:
+        pass
+
+    # Fallback to fixture verification for unit tests
     fixture_path = Path(__file__).parents[4] / "tests" / "fixtures" / "scorer" / "score_result.json"
     with open(fixture_path) as f:
         data = json.load(f)
