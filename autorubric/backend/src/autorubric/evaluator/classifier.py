@@ -37,7 +37,6 @@ def model_info() -> Dict[str, Any]:
         "backend": backend,
         "display_name": {
             "mock": "heuristic mock",
-            "nli": "pretrained NLI baseline",
             "cpu": "fine-tuned transformer (CPU)",
             "gpu": "fine-tuned transformer (GPU)",
         }.get(backend, backend),
