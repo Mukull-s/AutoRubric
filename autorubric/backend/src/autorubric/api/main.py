@@ -10,6 +10,12 @@ import redis.asyncio as redis
 import os
 from autorubric.evaluator import model_info
 
+import json
+from pathlib import Path
+from autorubric.core.db import AsyncSessionLocal, engine, Base, User, RubricModel
+from autorubric.core.security import get_password_hash
+from sqlalchemy import select
+
 logger = logging.getLogger(__name__)
 
 @asynccontextmanager
@@ -21,6 +27,44 @@ async def lifespan(app: FastAPI):
         logger.info("Database tables initialized successfully.")
     except Exception as e:
         logger.warning(f"Database table auto-creation skipped or failed: {e}")
+
+    # Seed default admin and rubric if DB is empty
+    try:
+        async with AsyncSessionLocal() as session:
+            admin_email = os.environ.get("ADMIN_EMAIL", "admin@example.com").lower()
+            admin_pass = os.environ.get("ADMIN_PASS", os.environ.get("ADMIN_PASSWORD", "admin"))
+            stmt = select(User).where(User.email == admin_email)
+            existing_admin = (await session.execute(stmt)).scalar_one_or_none()
+            if not existing_admin:
+                admin_user = User(
+                    email=admin_email,
+                    password_hash=get_password_hash(admin_pass),
+                    role="admin",
+                    full_name="Default Administrator",
+                    is_active=True
+                )
+                session.add(admin_user)
+                await session.commit()
+                logger.info(f"Default admin user seeded: {admin_email}")
+
+            rubric_stmt = select(RubricModel)
+            existing_rubric = (await session.execute(rubric_stmt)).scalars().first()
+            if not existing_rubric:
+                fixture_paths = [
+                    Path(__file__).resolve().parents[4] / "backend" / "tests" / "fixtures" / "rubrics" / "rubric.json",
+                    Path(__file__).resolve().parents[3] / "demo" / "rubric.json"
+                ]
+                for fp in fixture_paths:
+                    if fp.exists():
+                        with open(fp, encoding="utf-8") as f:
+                            data = json.load(f)
+                            model = RubricModel(id=data["id"], title=data.get("title", "Biology Basics"), data=data)
+                            session.add(model)
+                            await session.commit()
+                            logger.info(f"Default rubric seeded into database: {data['id']}")
+                            break
+    except Exception as e:
+        logger.warning(f"Database table seeding note: {e}")
 
     logger.info(f"Stage Modes - Extraction: {config.STAGE_EXTRACTION_MODE}, Segmentation: {config.STAGE_SEGMENTATION_MODE}")
     logger.info(f"Stage Modes - Retrieval: {config.STAGE_RETRIEVAL_MODE}, Evaluation: {config.STAGE_EVALUATION_MODE}")

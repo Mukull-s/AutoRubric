@@ -5,7 +5,7 @@ WORKDIR /app
 RUN pip install --no-cache-dir hatchling
 
 COPY pyproject.toml .
-RUN pip install --no-cache-dir . networkx numpy python-dotenv
+RUN pip install --no-cache-dir . networkx numpy python-dotenv argon2-cffi PyJWT email-validator
 
 COPY src/ ./src/
 COPY alembic.ini .

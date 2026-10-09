@@ -232,7 +232,7 @@ def node_score(state: PipelineState):
         "scorer_version": SCORER_VERSION
     }
     
-    score_res = score(state.get("classifications", []), state["rubric"], state.get("verdicts", []))
+    score_res = score(state.get("classifications", []), state["rubric"], state.get("verdicts", []), propositions=state.get("propositions", []))
     score_res.doc_id = state.get("doc_id", "unknown")
     state["score"] = score_res
     

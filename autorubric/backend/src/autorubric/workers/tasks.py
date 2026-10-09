@@ -34,22 +34,38 @@ def _run_sync(coro):
     acks_late=True,
     reject_on_worker_lost=True
 )
-def run_pipeline(self, job_id: str, rubric_dict: dict, pdf_bytes_hex: str):
+def run_pipeline(self, job_id: str, rubric_dict: dict, pdf_bytes_hex: str, doc_id: str = None):
     try:
+        from autorubric.core.db import AsyncSessionLocal, Result as DBResult, Job
+        import logging
+        logger = logging.getLogger(__name__)
+
+        # Resolve real doc_id from parameter or Job record
+        real_doc_id = doc_id
+        if not real_doc_id:
+            async def get_doc_id():
+                async with AsyncSessionLocal() as session:
+                    j = await session.get(Job, job_id)
+                    return j.submission_id if j else None
+            try:
+                real_doc_id = _run_sync(get_doc_id())
+            except Exception as e:
+                logger.warning(f"Could not fetch doc_id for job {job_id}: {e}")
+        if not real_doc_id:
+            real_doc_id = job_id
+
         graph = build_graph()
         rubric = Rubric.model_validate(rubric_dict)
         pdf_bytes = bytes.fromhex(pdf_bytes_hex)
         
         initial_state = {
-            "doc_id": job_id,
+            "doc_id": real_doc_id,
             "rubric": rubric,
             "pdf_bytes": pdf_bytes,
             "status": JobStatus.QUEUED
         }
         
         result = graph.invoke(initial_state)
-        
-        from autorubric.core.db import AsyncSessionLocal, Result as DBResult, Job
         
         async def save_final():
             try:
@@ -71,26 +87,35 @@ def run_pipeline(self, job_id: str, rubric_dict: dict, pdf_bytes_hex: str):
                             "stage_modes": stage_modes,
                             "fixture_data_used": any(mode == "stub" for mode in stage_modes.values()),
                         }
+                        total_val = getattr(score_res, "total", getattr(score_res, "total_score", 0.0))
                         res = DBResult(
-                            doc_id=job_id,
+                            doc_id=real_doc_id,
                             rubric_id=rubric.id if hasattr(rubric, "id") else "unknown",
                             data=score_data,
-                            total_score=score_res.total_score,
+                            total_score=total_val,
                             needs_review=score_res.needs_review,
                             audit_bundle=result.get("audit_bundle")
                         )
-                        session.add(res)
+                        existing_res = await session.get(DBResult, real_doc_id)
+                        if existing_res:
+                            existing_res.data = score_data
+                            existing_res.total_score = total_val
+                            existing_res.needs_review = score_res.needs_review
+                            existing_res.audit_bundle = result.get("audit_bundle")
+                        else:
+                            session.add(res)
                     job = await session.get(Job, job_id)
                     if job:
                         job.status = result["status"]
                     await session.commit()
-            except Exception:
-                pass
+            except Exception as e:
+                logger.error(f"Error in save_final for job {job_id}: {e}", exc_info=True)
+                raise
                 
         try:
             _run_sync(save_final())
-        except Exception:
-            pass
+        except Exception as e:
+            logger.error(f"Error executing save_final for job {job_id}: {e}", exc_info=True)
         
         return {"status": result["status"]}
     except TransientError as e:

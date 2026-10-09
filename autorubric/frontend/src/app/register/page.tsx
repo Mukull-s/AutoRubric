@@ -23,8 +23,9 @@ const registerSchema = z.object({
   path: ["password"],
 });
 
-type FormData = z.infer<typeof registerSchema>;
-type FormErrors = Partial<Record<keyof FormData, string>>;
+type RegisterFormData = z.infer<typeof registerSchema>;
+type RegisterField = 'full_name' | 'email' | 'password' | 'confirm_password' | 'registration_code';
+type FormErrors = Partial<Record<RegisterField, string>>;
 
 export default function RegisterPage() {
   const { doRegister, token } = useAuth();
@@ -36,7 +37,7 @@ export default function RegisterPage() {
     }
   }, [token, router]);
 
-  const [formData, setFormData] = useState({
+  const [formData, setFormData] = useState<RegisterFormData>({
     full_name: '',
     email: '',
     password: '',
@@ -48,12 +49,20 @@ export default function RegisterPage() {
   const [isLoading, setIsLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
 
-  const errorRefs = {
-    full_name: useRef<HTMLInputElement>(null),
-    email: useRef<HTMLInputElement>(null),
-    password: useRef<HTMLInputElement>(null),
-    confirm_password: useRef<HTMLInputElement>(null),
-    registration_code: useRef<HTMLInputElement>(null),
+  const fullNameRef = useRef<HTMLInputElement>(null);
+  const emailRef = useRef<HTMLInputElement>(null);
+  const passwordRef = useRef<HTMLInputElement>(null);
+  const confirmPasswordRef = useRef<HTMLInputElement>(null);
+  const registrationCodeRef = useRef<HTMLInputElement>(null);
+
+  const getFieldRef = (field: RegisterField) => {
+    switch (field) {
+      case 'full_name': return fullNameRef;
+      case 'email': return emailRef;
+      case 'password': return passwordRef;
+      case 'confirm_password': return confirmPasswordRef;
+      case 'registration_code': return registrationCodeRef;
+    }
   };
 
   const getPasswordStrength = (pass: string) => {
@@ -65,7 +74,7 @@ export default function RegisterPage() {
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setFormData(prev => ({ ...prev, [e.target.name]: e.target.value }));
-    if (errors[e.target.name as keyof FormData]) {
+    if (errors[e.target.name as RegisterField]) {
       setErrors(prev => ({ ...prev, [e.target.name]: '' }));
     }
   };
@@ -81,10 +90,10 @@ export default function RegisterPage() {
     
     if (!result.success) {
       const fieldErrors: FormErrors = {};
-      let firstErrorField: keyof FormData | null = null;
+      let firstErrorField: RegisterField | null = null;
       
       result.error.issues.forEach(issue => {
-        const path = issue.path[0] as keyof FormData;
+        const path = issue.path[0] as RegisterField;
         if (!fieldErrors[path]) {
           fieldErrors[path] = issue.message;
           if (!firstErrorField) firstErrorField = path;
@@ -93,8 +102,9 @@ export default function RegisterPage() {
       
       setErrors(fieldErrors);
       
-      if (firstErrorField && errorRefs[firstErrorField]?.current) {
-        errorRefs[firstErrorField].current?.focus();
+      if (firstErrorField) {
+        const targetRef = getFieldRef(firstErrorField);
+        targetRef?.current?.focus();
       }
       return;
     }
@@ -147,7 +157,7 @@ export default function RegisterPage() {
               Full Name <span className="text-zinc-400 font-normal">(Optional)</span>
             </span>
             <input
-              ref={errorRefs.full_name}
+              ref={fullNameRef}
               type="text"
               name="full_name"
               autoComplete="name"
@@ -164,7 +174,7 @@ export default function RegisterPage() {
           <label className="block">
             <span className="block text-xs font-medium text-zinc-600 mb-1.5 ml-1">Email *</span>
             <input
-              ref={errorRefs.email}
+              ref={emailRef}
               type="email"
               name="email"
               autoComplete="email"
@@ -190,7 +200,7 @@ export default function RegisterPage() {
               </span>
               <div className="relative">
                 <input
-                  ref={errorRefs.password}
+                  ref={passwordRef}
                   type={showPassword ? "text" : "password"}
                   name="password"
                   autoComplete="new-password"
@@ -217,7 +227,7 @@ export default function RegisterPage() {
           <label className="block">
             <span className="block text-xs font-medium text-zinc-600 mb-1.5 ml-1">Confirm Password *</span>
             <input
-              ref={errorRefs.confirm_password}
+              ref={confirmPasswordRef}
               type={showPassword ? "text" : "password"}
               name="confirm_password"
               autoComplete="new-password"
@@ -236,7 +246,7 @@ export default function RegisterPage() {
               Invite Code <span className="text-zinc-400 font-normal">(Optional)</span>
             </span>
             <input
-              ref={errorRefs.registration_code}
+              ref={registrationCodeRef}
               type="text"
               name="registration_code"
               className="w-full px-4 py-2.5 rounded-xl bg-white/70 border border-black/[0.08] text-sm text-zinc-900 placeholder:text-zinc-400 focus:bg-white focus:border-zinc-900 focus:ring-4 focus:ring-zinc-900/5 outline-none transition-all duration-200"

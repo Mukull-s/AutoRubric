@@ -60,9 +60,10 @@ async def verify_result(doc_id: str, current_user: dict = Depends(get_current_us
                 new_score.doc_id = doc_id
                 
                 diffs = []
-                orig_score = res.data.get("total_score", 0.0)
-                if abs(new_score.total_score - orig_score) > 1e-4:
-                    diffs.append(f"Score recalculation mismatch: {new_score.total_score} vs {orig_score}")
+                orig_score = res.data.get("total", res.data.get("total_score", 0.0))
+                new_tot = getattr(new_score, "total", getattr(new_score, "total_score", 0.0))
+                if abs(new_tot - orig_score) > 1e-4:
+                    diffs.append(f"Score recalculation mismatch: {new_tot} vs {orig_score}")
                 return {"match": len(diffs) == 0, "differences": diffs}
     except Exception:
         pass

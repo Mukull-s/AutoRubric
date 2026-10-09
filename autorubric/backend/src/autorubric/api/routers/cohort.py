@@ -22,19 +22,34 @@ async def get_cohort(cohort_id: str, current_user: dict = Depends(get_current_us
         
         # Get list of docs with score and needs-review flag
         stmt = (
-            select(Submission.id, Submission.filename, Job.status, Result.total_score, Result.needs_review)
+            select(Submission.id, Submission.filename, Job.id, Job.status, Result.total_score, Result.needs_review)
             .join(Job, Submission.id == Job.submission_id)
             .outerjoin(Result, Submission.id == Result.doc_id)
             .where(Submission.cohort_id == cohort_id)
         )
         docs = []
+        jobs = []
         for row in await session.execute(stmt):
+            sub_id, fname, j_id, j_status, score_val, needs_rev = row
+            status_str = j_status.value if hasattr(j_status, "value") else str(j_status)
             docs.append({
-                "doc_id": row.id,
-                "filename": row.filename,
-                "status": row.status.value,
-                "score": row.total_score,
-                "needs_review": row.needs_review
+                "doc_id": sub_id,
+                "filename": fname,
+                "job_id": j_id,
+                "status": status_str,
+                "score": score_val,
+                "needs_review": needs_rev
+            })
+            jobs.append({
+                "job_id": j_id,
+                "doc_id": sub_id,
+                "file_name": fname,
+                "filename": fname,
+                "status": status_str,
+                "created_at": "",
+                "updated_at": "",
+                "events": [],
+                "error": None
             })
             
         if not docs and not status_counts:
@@ -42,8 +57,11 @@ async def get_cohort(cohort_id: str, current_user: dict = Depends(get_current_us
             
         return {
             "cohort_id": cohort_id,
-            "status_counts": {status.value: count for status, count in status_counts.items()},
-            "docs": docs
+            "id": cohort_id,
+            "name": cohort_id,
+            "status_counts": {status.value if hasattr(status, "value") else str(status): count for status, count in status_counts.items()},
+            "docs": docs,
+            "jobs": jobs
         }
 
 
@@ -56,16 +74,18 @@ async def get_collusion(cohort_id: str, current_user: dict = Depends(get_current
     async with AsyncSessionLocal() as session:
         # Get DONE or NEEDS_REVIEW docs
         stmt = (
-            select(Submission.id)
+            select(Submission.id, Job.id)
             .join(Job, Submission.id == Job.submission_id)
             .where(Submission.cohort_id == cohort_id)
             .where(Job.status.in_([JobStatus.DONE, JobStatus.NEEDS_REVIEW]))
             .order_by(Submission.id)
         )
-        doc_ids = [row[0] for row in await session.execute(stmt)]
+        rows = (await session.execute(stmt)).all()
+        doc_ids = [r[0] for r in rows]
+        doc_to_job = {r[0]: r[1] for r in rows}
         
         if len(doc_ids) < 2:
-            return {"cohort_id": cohort_id, "pairs": [], "cluster_labels": {}}
+            return {"cohort_id": cohort_id, "doc_pairs": [], "pairs": [], "cluster_labels": {}}
             
         # Check cache
         docs_hash = hashlib.sha256(",".join(doc_ids).encode()).hexdigest()
@@ -78,11 +98,14 @@ async def get_collusion(cohort_id: str, current_user: dict = Depends(get_current
         # Need to recompute. Fetch embeddings
         embeddings = []
         for doc_id in doc_ids:
+            possible_ids = [doc_id]
+            if doc_id in doc_to_job:
+                possible_ids.append(doc_to_job[doc_id])
             art_stmt = select(JobArtifact).where(
-                JobArtifact.job_id == doc_id,
+                JobArtifact.job_id.in_(possible_ids),
                 JobArtifact.stage == "segment"
             )
-            art = (await session.execute(art_stmt)).scalar_one_or_none()
+            art = (await session.execute(art_stmt)).scalars().first()
             if art and "embeddings" in art.payload:
                 embeddings.append({
                     "doc_id": doc_id,

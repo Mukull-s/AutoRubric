@@ -28,11 +28,15 @@ def mock_session_local(monkeypatch, mock_db_users):
         async def __aenter__(self): return self
         async def __aexit__(self, *args): pass
         async def execute(self, stmt):
-            # Very basic mock for select(User).where(User.email == email)
-            # Find the email in the stmt string
             stmt_str = str(stmt).lower()
+            try:
+                params_str = str(stmt.compile().params).lower()
+            except Exception:
+                params_str = ""
             for email, user in mock_db_users.items():
-                if email in stmt_str or email in str(stmt.compile().params):
+                if email.lower() in stmt_str or email.lower() in params_str:
+                    return MockResult(user)
+                if str(user.id).lower() in stmt_str or str(user.id).lower() in params_str:
                     return MockResult(user)
             return MockResult(None)
             
@@ -45,6 +49,7 @@ def mock_session_local(monkeypatch, mock_db_users):
 
     monkeypatch.setattr("autorubric.api.routers.auth.AsyncSessionLocal", lambda: MockSession())
     monkeypatch.setattr("autorubric.api.deps.AsyncSessionLocal", lambda: MockSession())
+    monkeypatch.setattr("autorubric.api.routers.auth.redis_client", None)
     return MockSession
 
 @pytest.fixture

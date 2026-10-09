@@ -7,13 +7,13 @@ from typing import Optional, Dict, Any, List
 
 from fastapi import APIRouter, Depends, HTTPException
 from fastapi.security import OAuth2PasswordBearer
-from jose import JWTError, jwt
 from sqlalchemy import select
 
 from autorubric.contracts import Rubric
 from autorubric.contracts.rubric import Criterion, CreditMap
 from autorubric.core.config import config
 from autorubric.core.db import AsyncSessionLocal, RubricModel
+from autorubric.core.security import decode_access_token
 
 router = APIRouter()
 
@@ -25,9 +25,9 @@ def get_optional_user(token: Optional[str] = Depends(oauth2_scheme_optional)) ->
     if not token:
         return None
     try:
-        payload = jwt.decode(token, config.JWT_SECRET, algorithms=["HS256"])
+        payload = decode_access_token(token)
         return {"username": payload.get("sub")}
-    except (JWTError, Exception):
+    except Exception:
         return None
 
 
@@ -115,15 +115,6 @@ async def get_rubric(rubric_id: str, current_user: Optional[Dict[str, Any]] = De
                 rubric = Rubric.model_validate(model.data)
                 _rubrics[rubric_id] = rubric
                 return rubric
-    except Exception:
-        pass
-
-    # Return fixture rubric if not found
-    try:
-        fixture_path = Path(__file__).parents[4] / "tests" / "fixtures" / "rubrics" / "rubric.json"
-        if fixture_path.exists():
-            with open(fixture_path, encoding="utf-8") as f:
-                return Rubric.model_validate(json.load(f))
     except Exception:
         pass
 

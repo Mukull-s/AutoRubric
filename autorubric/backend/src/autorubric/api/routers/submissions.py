@@ -65,7 +65,7 @@ async def process_upload(file: UploadFile, rubric_id: str, cohort_id: Optional[s
     except Exception as exc:
         raise HTTPException(status_code=503, detail=f"Rubric storage is unavailable: {exc}") from exc
         
-    run_pipeline.delay(job_id, rubric_dict, content.hex())
+    run_pipeline.delay(job_id, rubric_dict, content.hex(), doc_id=doc_id)
     
     return {"filename": file.filename, "doc_id": doc_id, "job_id": job_id}
 
@@ -77,7 +77,7 @@ async def create_submission(
     current_user: dict = Depends(get_current_user)
 ):
     result = await process_upload(file, rubric_id)
-    return {"job_id": result["job_id"]}
+    return {"job_id": result["job_id"], "doc_id": result["doc_id"], "filename": result["filename"]}
 
 @router.post("/batch")
 async def create_batch_submission(
@@ -86,14 +86,20 @@ async def create_batch_submission(
     cohort_id: Optional[str] = Form(None),
     current_user: dict = Depends(get_current_user)
 ):
+    actual_cohort_id = cohort_id or f"cohort-{uuid.uuid4().hex[:8]}"
     results = []
     errors = []
     
     for file in files:
         try:
-            res = await process_upload(file, rubric_id, cohort_id)
+            res = await process_upload(file, rubric_id, actual_cohort_id)
             results.append(res)
         except HTTPException as e:
             errors.append({"filename": file.filename, "error": e.detail})
             
-    return {"results": results, "errors": errors}
+    return {
+        "cohort_id": actual_cohort_id,
+        "results": results,
+        "errors": errors,
+        "jobs": [{"job_id": r["job_id"], "file_name": r["filename"], "doc_id": r["doc_id"]} for r in results]
+    }

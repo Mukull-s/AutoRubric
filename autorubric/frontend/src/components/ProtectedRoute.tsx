@@ -15,19 +15,21 @@ export function ProtectedRoute({ children }: { children: React.ReactNode }) {
     setMounted(true);
   }, []);
 
+  const isPublicRoute = pathname === '/login' || pathname === '/register';
+
   useEffect(() => {
-    if (mounted && pathname !== '/login') {
+    if (mounted && !isPublicRoute) {
       const stored = typeof window !== 'undefined' ? (sessionStorage.getItem('token') || localStorage.getItem('token')) : null;
       if (!token && !stored) {
         router.push('/login');
       }
     }
-  }, [mounted, token, pathname, router]);
+  }, [mounted, token, pathname, isPublicRoute, router]);
 
   if (!mounted) return null; // Avoid hydration mismatch
 
   const hasToken = token || (typeof window !== 'undefined' && (sessionStorage.getItem('token') || localStorage.getItem('token')));
-  if (!hasToken && pathname !== '/login') {
+  if (!hasToken && !isPublicRoute) {
     return null; // Wait for redirect
   }
 

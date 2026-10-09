@@ -3,7 +3,7 @@ from pydantic import BaseModel, EmailStr, validator
 from datetime import datetime
 from autorubric.core.config import config
 from autorubric.core.security import get_password_hash, verify_password, create_access_token
-from autorubric.core.db import User
+from autorubric.core.db import User, AsyncSessionLocal
 from autorubric.api.deps import get_db_session, get_current_user
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -39,13 +39,13 @@ async def check_rate_limit(request: Request, email: str = None):
                     detail="Too many attempts",
                     headers={"Retry-After": str(ttl if ttl > 0 else 900)}
                 )
-    except redis.RedisError as e:
-        if config.APP_ENV == "dev":
+    except HTTPException:
+        raise
+    except Exception as e:
+        if config.APP_ENV != "prod":
             logger.warning(f"Redis unavailable for rate limiting: {e}")
         else:
             raise HTTPException(status_code=500, detail="Internal server error")
-    except HTTPException:
-        raise
 
 class RegisterRequest(BaseModel):
     email: EmailStr

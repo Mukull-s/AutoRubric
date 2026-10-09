@@ -30,6 +30,7 @@ async def get_job_status(job_id: str, current_user: dict = Depends(get_current_u
                 return {
                     "job_id": job.id,
                     "submission_id": job.submission_id,
+                    "doc_id": job.submission_id,
                     "status": job.status,
                     "error": job.error,
                     "created_at": job.created_at.isoformat() if job.created_at else datetime.utcnow().isoformat(),

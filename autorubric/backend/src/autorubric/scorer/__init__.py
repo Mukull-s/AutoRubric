@@ -6,7 +6,8 @@ import networkx as nx
 
 SCORER_VERSION = "1.0.0"
 
-def score(classifications: list[Classification], rubric: Rubric, verdicts: list[CriticVerdict]) -> ScoreResult:
+def score(classifications: list[Classification], rubric: Rubric, verdicts: list[CriticVerdict], propositions: list = None) -> ScoreResult:
+    prop_map = {p.id: p for p in (propositions or [])}
     # 1. Trust filter (fail closed)
     trusted_verdicts = {v.classification_id: v for v in verdicts if v.trusted}
     untrusted_verdicts = {v.classification_id: v for v in verdicts if not v.trusted}
@@ -103,12 +104,16 @@ def score(classifications: list[Classification], rubric: Rubric, verdicts: list[
                         
         marks = (Decimal(str(criterion.weight)) * final_credit).quantize(Decimal(DECIMAL_PLACES), rounding=ROUND_HALF_UP)
         
+        evidence_bboxes = []
+        if best_c and best_c.prop_id in prop_map:
+            evidence_bboxes = list(prop_map[best_c.prop_id].bboxes)
+
         per_criterion[crit_id] = CriterionResult(
             criterion_id=crit_id,
             label=best_c.label,
             credit=float(final_credit),
             marks=float(marks),
-            evidence_bboxes=[],
+            evidence_bboxes=evidence_bboxes,
             trusted=True
         )
         
