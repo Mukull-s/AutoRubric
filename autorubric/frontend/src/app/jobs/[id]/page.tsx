@@ -11,15 +11,16 @@ export default function JobPage() {
   const params = useParams();
   const id = params.id as string;
 
-  const { data: job, isLoading, error, refetch } = useQuery({
+  const { data: job, isLoading, error, refetch, isFetching } = useQuery({
     queryKey: ['job', id],
     queryFn: () => getJob(id),
     refetchInterval: (query) => {
       const state = query.state.data;
-      if (!state) return 2000;
+      if (!state) return 1500;
       const term = ['DONE', 'FAILED', 'NEEDS_REVIEW'].includes(state.status);
-      return term ? false : 2000;
-    }
+      return term ? false : 1500;
+    },
+    refetchIntervalInBackground: true,
   });
 
   const retryMutation = useMutation({
@@ -39,13 +40,25 @@ export default function JobPage() {
   return (
     <div className="max-w-2xl mx-auto p-6 bg-white shadow rounded border">
       <Link href="/" className="text-blue-600 hover:underline mb-4 inline-block">&larr; Back to Dashboard</Link>
-      <h1 className="text-2xl font-bold mb-6">Job Status: {id}</h1>
+      <div className="flex items-center justify-between mb-6">
+        <h1 className="text-2xl font-bold">Job Status: {id}</h1>
+        <button 
+          onClick={() => refetch()} 
+          disabled={isFetching}
+          className="text-xs px-3 py-1.5 rounded border border-gray-300 hover:bg-gray-50 text-gray-600 flex items-center gap-1.5 transition-colors disabled:opacity-50"
+        >
+          <span>{isFetching ? 'Refreshing...' : 'Refresh Status'}</span>
+        </button>
+      </div>
       
-      <div className="mb-6">
-        <span className="font-medium mr-2">Status:</span>
-        <span className={`px-2 py-1 rounded text-white ${isFailed ? 'bg-red-500' : isDone ? 'bg-green-500' : needsReview ? 'bg-yellow-500' : 'bg-blue-500'}`}>
+      <div className="mb-6 flex items-center gap-3">
+        <span className="font-medium">Status:</span>
+        <span className={`px-2.5 py-1 rounded text-xs font-semibold text-white ${isFailed ? 'bg-red-500' : isDone ? 'bg-green-600' : needsReview ? 'bg-yellow-500' : 'bg-blue-600'}`}>
           {currentStatus}
         </span>
+        {!isDone && !isFailed && (
+          <span className="text-xs text-gray-400 animate-pulse">Running autonomous grading pipeline...</span>
+        )}
       </div>
 
       <div className="mb-6">

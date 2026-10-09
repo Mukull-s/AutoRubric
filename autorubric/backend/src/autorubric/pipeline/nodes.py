@@ -45,8 +45,8 @@ def track_stage(stage_name: str, new_status: JobStatus):
         @wraps(func)
         def wrapper(state: dict) -> dict:
             job_id = state.get("job_id") or state.get("doc_id", "unknown")
-            utc_tz = getattr(datetime, "UTC", datetime.timezone.utc)
-            started_at = datetime.datetime.now(utc_tz)
+            now_utc = datetime.datetime.now(datetime.timezone.utc).replace(tzinfo=None)
+            started_at = now_utc
             state["status"] = new_status
             
             from autorubric.core.db import AsyncSessionLocal, Job, JobEvent
@@ -58,11 +58,13 @@ def track_stage(stage_name: str, new_status: JobStatus):
                         job = await session.get(Job, job_id)
                         if job:
                             job.status = new_status
+                            job.updated_at = now_utc
                         event = JobEvent(id=str(uuid.uuid4()), job_id=job_id, stage=stage_name, started_at=started_at)
                         session.add(event)
                         await session.commit()
-                except Exception:
-                    pass
+                except Exception as ex:
+                    import logging
+                    logging.getLogger(__name__).warning(f"Error logging stage start {stage_name}: {ex}")
             
             try:
                 _run_sync(log_start())
@@ -79,11 +81,12 @@ def track_stage(stage_name: str, new_status: JobStatus):
                             stmt = select(JobEvent).where(JobEvent.job_id == job_id, JobEvent.stage == stage_name).order_by(JobEvent.started_at.desc())
                             event = (await session.execute(stmt)).scalars().first()
                             if event:
-                                event.finished_at = datetime.datetime.now(datetime.UTC)
+                                event.finished_at = datetime.datetime.now(datetime.timezone.utc).replace(tzinfo=None)
                                 event.ok = True
                             await session.commit()
-                    except Exception:
-                        pass
+                    except Exception as ex:
+                        import logging
+                        logging.getLogger(__name__).warning(f"Error logging stage success {stage_name}: {ex}")
                 
                 try:
                     _run_sync(log_success())
@@ -99,12 +102,13 @@ def track_stage(stage_name: str, new_status: JobStatus):
                             stmt = select(JobEvent).where(JobEvent.job_id == job_id, JobEvent.stage == stage_name).order_by(JobEvent.started_at.desc())
                             event = (await session.execute(stmt)).scalars().first()
                             if event:
-                                event.finished_at = datetime.datetime.now(datetime.UTC)
+                                event.finished_at = datetime.datetime.now(datetime.timezone.utc).replace(tzinfo=None)
                                 event.ok = False
                                 event.error = str(e)
                             await session.commit()
-                    except Exception:
-                        pass
+                    except Exception as ex:
+                        import logging
+                        logging.getLogger(__name__).warning(f"Error logging stage failure {stage_name}: {ex}")
                         
                 try:
                     _run_sync(log_failure())
