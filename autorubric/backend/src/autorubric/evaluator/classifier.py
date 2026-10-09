@@ -35,6 +35,12 @@ def model_info() -> Dict[str, Any]:
     has_weights = os.path.isdir(model_path) and any(os.scandir(model_path))
     return {
         "backend": backend,
+        "display_name": {
+            "mock": "heuristic mock",
+            "nli": "pretrained NLI baseline",
+            "cpu": "fine-tuned transformer (CPU)",
+            "gpu": "fine-tuned transformer (GPU)",
+        }.get(backend, backend),
         "model_path": model_path,
         "weights_present": has_weights,
         "version": "1.0.0",
@@ -58,47 +64,39 @@ def _classify_mock(pairs: List[Union[EvalPair, Candidate]]) -> List[Classificati
     for p in pairs:
         prop_text = getattr(p, "proposition_text", "") or ""
         crit_text = getattr(p, "criterion_text", "") or ""
+        if not prop_text.strip() or not crit_text.strip():
+            raise ValueError(
+                f"Evaluator requires proposition_text and criterion_text "
+                f"for {p.prop_id}/{p.criterion_id}; similarity alone cannot determine a label."
+            )
         prop_id = p.prop_id
         crit_id = p.criterion_id
 
         p_words = set(re.findall(r"\b\w+\b", prop_text.lower()))
         c_words = set(re.findall(r"\b\w+\b", crit_text.lower()))
 
-        # If text is empty (e.g. basic Candidate without text fields), use similarity score
-        if not p_words or not c_words:
-            sim = getattr(p, "similarity", 0.5)
-            if sim >= 0.75:
-                lbl = Label.FULL_CREDIT
-                conf = round(min(0.95, sim + 0.1), 4)
-            elif sim >= 0.40:
-                lbl = Label.PARTIAL_CREDIT
-                conf = round(sim, 4)
-            else:
-                lbl = Label.NO_CREDIT
-                conf = round(1.0 - sim, 4)
+        # Check for contradiction / misconception cues
+        has_negation = bool(p_words.intersection(negation_words))
+        has_sub_swap = any(
+            any(w.startswith(s1) for w in p_words) and any(w.startswith(s2) for w in c_words)
+            for s1, s2 in misconception_stems
+        )
+
+        intersection = p_words.intersection(c_words)
+        overlap_ratio = len(intersection) / max(len(c_words), 1)
+
+        if has_sub_swap or (has_negation and overlap_ratio > 0.3):
+            lbl = Label.MISCONCEPTION
+            conf = 0.88
+        elif overlap_ratio >= 0.40:
+            lbl = Label.FULL_CREDIT
+            conf = round(min(0.98, 0.70 + overlap_ratio * 0.3), 4)
+        elif overlap_ratio >= 0.20:
+            lbl = Label.PARTIAL_CREDIT
+            conf = round(0.60 + overlap_ratio * 0.4, 4)
         else:
-            # Check for contradiction / misconception cues
-            has_negation = bool(p_words.intersection(negation_words))
-            has_sub_swap = any(
-                any(w.startswith(s1) for w in p_words) and any(w.startswith(s2) for w in c_words)
-                for s1, s2 in misconception_stems
-            )
-
-            intersection = p_words.intersection(c_words)
-            overlap_ratio = len(intersection) / max(len(c_words), 1)
-
-            if has_sub_swap or (has_negation and overlap_ratio > 0.3):
-                lbl = Label.MISCONCEPTION
-                conf = 0.88
-            elif overlap_ratio >= 0.40:
-                lbl = Label.FULL_CREDIT
-                conf = round(min(0.98, 0.70 + overlap_ratio * 0.3), 4)
-            elif overlap_ratio >= 0.20:
-                lbl = Label.PARTIAL_CREDIT
-                conf = round(0.60 + overlap_ratio * 0.4, 4)
-            else:
-                lbl = Label.NO_CREDIT
-                conf = round(0.75 + (1.0 - overlap_ratio) * 0.15, 4)
+            lbl = Label.NO_CREDIT
+            conf = round(0.75 + (1.0 - overlap_ratio) * 0.15, 4)
 
         results.append(
             Classification(
@@ -118,9 +116,6 @@ def _load_transformer_model(device: str):
     if _LOADED_MODEL is not None:
         return _LOADED_MODEL, _LOADED_TOKENIZER, _LABEL_MAP
 
-    import torch
-    from transformers import AutoTokenizer, AutoModelForSequenceClassification
-
     model_dir = os.environ.get("EVALUATOR_MODEL_PATH", str(Path(__file__).resolve().parents[4] / "ml" / "checkpoint"))
 
     if not os.path.isdir(model_dir) or not (Path(model_dir) / "config.json").exists():
@@ -131,6 +126,9 @@ def _load_transformer_model(device: str):
         raise FileNotFoundError(
             f"Evaluator weights not found at {model_dir}. Set EVALUATOR_BACKEND=mock or provide model weights."
         )
+
+    import torch
+    from transformers import AutoTokenizer, AutoModelForSequenceClassification
 
     label_map_file = Path(model_dir) / "label_map.json"
     if label_map_file.exists():

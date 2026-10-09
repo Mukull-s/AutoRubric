@@ -36,21 +36,12 @@ async def get_job_status(job_id: str, current_user: dict = Depends(get_current_u
                     "updated_at": job.updated_at.isoformat() if job.updated_at else datetime.utcnow().isoformat(),
                     "events": events,
                 }
-    except Exception:
-        pass
+    except Exception as exc:
+        raise HTTPException(status_code=503, detail=f"Job storage is unavailable: {exc}") from exc
 
-    # Fallback status if job not in DB
-    return {
-        "job_id": job_id,
-        "status": JobStatus.DONE,
-        "error": None,
-        "created_at": datetime.utcnow().isoformat(),
-        "updated_at": datetime.utcnow().isoformat(),
-        "events": [],
-    }
+    raise HTTPException(status_code=404, detail="Job not found")
 
 @router.post("/{job_id}/retry")
 async def retry_job(job_id: str, current_user: dict = Depends(get_current_user)):
     # Mocking retry logic
     return {"message": "Job requeued", "job_id": job_id}
-

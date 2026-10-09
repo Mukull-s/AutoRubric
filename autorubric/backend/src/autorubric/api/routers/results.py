@@ -2,8 +2,6 @@ from fastapi import APIRouter, Depends, HTTPException, Response
 from ..deps import get_current_user
 from autorubric.contracts import ScoreResult, Rubric, Classification, CriticVerdict
 from autorubric.scorer import score, SCORER_VERSION
-import json
-from pathlib import Path
 from pydantic import BaseModel
 
 router = APIRouter()
@@ -69,32 +67,7 @@ async def verify_result(doc_id: str, current_user: dict = Depends(get_current_us
     except Exception:
         pass
 
-    # Fallback to fixture data for demo / tests
-    try:
-        fixture_path = Path(__file__).parents[4] / "tests" / "fixtures" / "scorer" / "score_result.json"
-        if fixture_path.exists():
-            with open(fixture_path) as f:
-                data = json.load(f)
-            original_score = ScoreResult.model_validate(data)
-            
-            rubric_fixture = Path(__file__).parents[4] / "tests" / "fixtures" / "rubrics" / "rubric.json"
-            classifications_fixture = Path(__file__).parents[4] / "tests" / "fixtures" / "evaluator" / "classifications.json"
-            verdicts_fixture = Path(__file__).parents[4] / "tests" / "fixtures" / "audit" / "critic_verdicts.json"
-            
-            with open(rubric_fixture) as f: rubric = Rubric.model_validate(json.load(f))
-            with open(classifications_fixture) as f: classifications = [Classification.model_validate(i) for i in json.load(f)]
-            with open(verdicts_fixture) as f: verdicts = [CriticVerdict.model_validate(i) for i in json.load(f)]
-            
-            new_score = score(classifications, rubric, verdicts)
-            new_score.doc_id = doc_id
-            
-            if new_score.model_dump() == original_score.model_dump():
-                return {"match": True, "differences": []}
-            return {"match": False, "differences": ["Mismatched scores"]}
-    except Exception:
-        pass
-
-    return {"match": True, "differences": []}
+    raise HTTPException(status_code=404, detail="No audit bundle is available for this result")
 
 @router.get("/{doc_id}/propositions")
 async def get_result_propositions(doc_id: str, current_user: dict = Depends(get_current_user)):
