@@ -43,11 +43,11 @@ cd D:\projects\capstone-1\AutoRubric\autorubric\backend
 python -m uvicorn autorubric.api.main:app --host 127.0.0.1 --port 8000 --reload
 ```
 
-> **Direct command without activation:**
-> ```powershell
-> cd D:\projects\capstone-1\AutoRubric\autorubric\backend
-> .\.venv\Scripts\python.exe -m uvicorn autorubric.api.main:app --host 127.0.0.1 --port 8000 --reload
-> ```
+**Direct one-line command (if already in backend folder):**
+```powershell
+.\.venv\Scripts\python.exe -m uvicorn autorubric.api.main:app --host 127.0.0.1 --port 8000 --reload
+```
+
 
 - **Health check:** [http://localhost:8000/health/ready](http://localhost:8000/health/ready)
 - **API Swagger docs:** [http://localhost:8000/docs](http://localhost:8000/docs)
