@@ -86,26 +86,20 @@ async def process_upload(
     if not rubric_dict:
         raise HTTPException(status_code=404, detail=f"Rubric '{rubric_id}' not found")
 
-    # Run pipeline via Celery if available, or async background thread for local/dev resilience
-    dispatched = False
-    try:
-        run_pipeline.delay(job_id, rubric_dict, content.hex())
-        dispatched = True
-    except Exception:
-        dispatched = False
+    # Execute pipeline asynchronously in background thread so it finishes immediately without needing a celery worker
+    def _safe_run():
+        try:
+            print(f"[PIPELINE] Starting pipeline execution for job: {job_id}")
+            from autorubric.workers.tasks import execute_pipeline_sync
+            res = execute_pipeline_sync(job_id, rubric_dict, content, doc_id)
+            print(f"[PIPELINE] Successfully finished job {job_id}: {res}")
+        except Exception as e:
+            import traceback
+            print(f"[PIPELINE ERROR] Failed job {job_id}: {e}\n{traceback.format_exc()}")
 
-    if not dispatched:
-        def _safe_run():
-            try:
-                from autorubric.workers.tasks import execute_pipeline_sync
-                execute_pipeline_sync(job_id, rubric_dict, content, doc_id)
-            except Exception as e:
-                import traceback
-                print(f"[PIPELINE ERROR] Failed job {job_id}: {e}\n{traceback.format_exc()}")
-
-        import threading
-        t = threading.Thread(target=_safe_run, daemon=True)
-        t.start()
+    import threading
+    t = threading.Thread(target=_safe_run, daemon=True)
+    t.start()
     
     return {"filename": file.filename, "doc_id": doc_id, "job_id": job_id}
 
