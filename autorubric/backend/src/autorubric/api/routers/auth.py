@@ -17,7 +17,15 @@ COMMON_PASSWORDS = {"password123", "password1234", "qwertyuiop", "1234567890"}
 
 redis_client = None
 if config.REDIS_URL:
-    redis_client = redis.from_url(config.REDIS_URL, decode_responses=True)
+    try:
+        redis_client = redis.from_url(
+            config.REDIS_URL,
+            decode_responses=True,
+            socket_timeout=0.3,
+            socket_connect_timeout=0.3,
+        )
+    except Exception:
+        redis_client = None
 
 async def check_rate_limit(request: Request, email: str = None):
     if not redis_client:
@@ -42,10 +50,7 @@ async def check_rate_limit(request: Request, email: str = None):
     except HTTPException:
         raise
     except Exception as e:
-        if config.APP_ENV != "prod":
-            logger.warning(f"Redis unavailable for rate limiting: {e}")
-        else:
-            raise HTTPException(status_code=500, detail="Internal server error")
+        logger.warning(f"Redis unavailable for rate limiting: {e}")
 
 class RegisterRequest(BaseModel):
     email: EmailStr
@@ -165,8 +170,11 @@ async def login(request: Request, session: AsyncSession = Depends(get_db_session
     if not verify_password(password, user.password_hash):
         raise invalid_creds
         
-    user.last_login_at = datetime.utcnow()
-    await session.commit()
+    try:
+        user.last_login_at = datetime.utcnow()
+        await session.commit()
+    except Exception as e:
+        logger.warning(f"Could not update last_login_at: {e}")
     
     token = create_access_token({
         "sub": str(user.id),

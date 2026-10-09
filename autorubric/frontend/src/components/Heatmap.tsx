@@ -7,13 +7,13 @@ import { useQuery } from '@tanstack/react-query';
 import { getCollusion } from '@/lib/api';
 import { Job } from '@/lib/api/schemas';
 
-export function CohortHeatmap({ jobs }: { jobs: Job[] }) {
+export function CohortHeatmap({ jobs, cohortId: propCohortId }: { jobs: Job[]; cohortId?: string }) {
   const router = useRouter();
   const [hoveredCell, setHoveredCell] = useState<string | null>(null);
 
   const doneJobs = jobs.filter(j => j.status === 'DONE' && j.doc_id);
   const docIds = doneJobs.map(j => j.doc_id!);
-  const cohortId = jobs.length > 0 ? (jobs[0] as unknown as { cohort_id: string }).cohort_id : null;
+  const cohortId = propCohortId || (jobs.length > 0 ? (jobs[0] as unknown as { cohort_id?: string }).cohort_id || null : null);
 
   const { data: report } = useQuery({
     queryKey: ['collusion', cohortId],

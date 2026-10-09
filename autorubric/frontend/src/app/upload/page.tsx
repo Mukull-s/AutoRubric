@@ -76,7 +76,10 @@ export default function UploadPage() {
       const fd = new FormData();
       files.forEach(f => fd.append('files', f));
       fd.append('rubric_id', rubricId);
-      if (cohortName) fd.append('cohort_name', cohortName);
+      if (cohortName) {
+        fd.append('cohort_name', cohortName);
+        fd.append('cohort_id', cohortName);
+      }
       batchMutation.mutate(fd);
     }
   };

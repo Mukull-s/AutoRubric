@@ -51,7 +51,8 @@ class Config:
     STAGE_AUDIT_MODE = os.environ.get("STAGE_AUDIT_MODE", "real")
     STAGE_ANNOTATION_MODE = os.environ.get("STAGE_ANNOTATION_MODE", "real")
     
-    EVALUATOR_BACKEND = os.environ.get("EVALUATOR_BACKEND", "mock").lower() # mock, cpu, gpu
+    EVALUATOR_BACKEND = os.environ.get("EVALUATOR_BACKEND", "groq").lower() # mock, cpu, gpu, groq
+    GROQ_API_KEY = os.environ.get("GROQ_API_KEY", "")
     EVALUATOR_ALLOW_MOCK_FALLBACK = os.environ.get("EVALUATOR_ALLOW_MOCK_FALLBACK", "false").lower() == "true"
     ALLOW_MOCK_EVALUATOR = os.environ.get("ALLOW_MOCK_EVALUATOR", "true").lower() == "true"
     EVALUATOR_MODEL_PATH = os.environ.get("EVALUATOR_MODEL_PATH", "")
@@ -66,10 +67,10 @@ if config.APP_ENV == "prod" and (not config.JWT_SECRET or config.JWT_SECRET == "
     logging.getLogger(__name__).warning("JWT_SECRET unset or default in prod; auto-generating a secure random secret.")
     config.JWT_SECRET = secrets.token_urlsafe(48)
 
-if config.EVALUATOR_BACKEND not in {"mock", "cpu", "gpu"}:
+if config.EVALUATOR_BACKEND not in {"mock", "cpu", "gpu", "groq"}:
     raise ValueError(
         f"Unsupported EVALUATOR_BACKEND={config.EVALUATOR_BACKEND!r}; "
-        "choose mock, cpu, or gpu."
+        "choose mock, cpu, gpu, or groq."
     )
 
 if config.APP_ENV == "prod" and config.EVALUATOR_BACKEND == "mock" and not config.ALLOW_MOCK_EVALUATOR:

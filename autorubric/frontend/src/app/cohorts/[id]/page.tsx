@@ -155,7 +155,7 @@ export default function CohortPage() {
           </Link>
         </div>
 
-        {cohort.jobs && <CohortHeatmap jobs={cohort.jobs} />}
+        {cohort.jobs && <CohortHeatmap jobs={cohort.jobs} cohortId={id} />}
         
         <div className="overflow-x-auto mt-6">
           <table className="w-full text-left border-collapse">

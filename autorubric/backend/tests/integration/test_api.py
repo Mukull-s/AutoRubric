@@ -8,13 +8,26 @@ import sys
 from unittest.mock import AsyncMock, patch, MagicMock
 import autorubric.core.db
 
+from autorubric.contracts import JobStatus
+
+class MockJob:
+    def __init__(self, job_id="job-test"):
+        self.id = job_id
+        self.submission_id = f"doc-{job_id}"
+        self.status = JobStatus.DONE
+        self.error = None
+        self.created_at = None
+        self.updated_at = None
+
 # Mock AsyncSessionLocal before imports
 class MockResult:
     def scalars(self): return self
     def first(self): return None
+    def all(self): return []
 
 mock_session = AsyncMock()
 mock_session.execute.return_value = MockResult()
+mock_session.get.side_effect = lambda model, ident: MockJob(ident)
 mock_session_local = MagicMock()
 mock_session_local.return_value.__aenter__.return_value = mock_session
 sys.modules['autorubric.core.db'].AsyncSessionLocal = mock_session_local
@@ -28,11 +41,15 @@ def anyio_backend():
 def override_get_current_user(monkeypatch):
     async def mock_get_current_user():
         return User(id=uuid.uuid4(), email="test@example.com", role="admin")
-    monkeypatch.setattr("autorubric.api.deps.get_current_user", mock_get_current_user)
-    monkeypatch.setattr("autorubric.api.routers.jobs.get_current_user", mock_get_current_user)
-    monkeypatch.setattr("autorubric.api.routers.results.get_current_user", mock_get_current_user)
-    monkeypatch.setattr("autorubric.api.routers.submissions.get_current_user", mock_get_current_user)
-    monkeypatch.setattr("autorubric.api.routers.cohort.get_current_user", mock_get_current_user)
+    from autorubric.api.deps import get_current_user
+    app.dependency_overrides[get_current_user] = mock_get_current_user
+    monkeypatch.setattr("autorubric.core.db.AsyncSessionLocal", mock_session_local)
+    monkeypatch.setattr("autorubric.api.routers.jobs.AsyncSessionLocal", mock_session_local)
+    monkeypatch.setattr("autorubric.api.routers.submissions.AsyncSessionLocal", mock_session_local)
+    monkeypatch.setattr("autorubric.api.routers.rubrics.AsyncSessionLocal", mock_session_local)
+    monkeypatch.setattr("autorubric.api.routers.cohort.AsyncSessionLocal", mock_session_local)
+    yield
+    app.dependency_overrides.clear()
 
 @pytest.mark.asyncio
 async def test_api_flow():
