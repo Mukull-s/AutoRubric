@@ -1,15 +1,47 @@
 from sqlalchemy.orm import declarative_base
-from sqlalchemy import Column, String, Float, JSON, DateTime, Boolean, Enum
+from sqlalchemy import Column, String, Float, JSON, DateTime, Boolean, Enum, Index, func
 from sqlalchemy.dialects.postgresql import JSONB
 from autorubric.contracts import JobStatus
 import datetime
 import uuid
-from sqlalchemy import Column, String, Float, JSON, DateTime, Boolean, Enum, Index, func
+from sqlalchemy.types import TypeDecorator, CHAR
 from sqlalchemy.dialects.postgresql import JSONB, UUID
 
 from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession
 from sqlalchemy.orm import declarative_base, sessionmaker
 from autorubric.core.config import config
+
+class GUID(TypeDecorator):
+    """Platform-independent GUID type.
+    Uses PostgreSQL's UUID type, otherwise uses CHAR(36).
+    """
+    impl = CHAR
+    cache_ok = True
+
+    def load_dialect_impl(self, dialect):
+        if dialect.name == "postgresql":
+            return dialect.type_descriptor(UUID(as_uuid=True))
+        else:
+            return dialect.type_descriptor(CHAR(36))
+
+    def process_bind_param(self, value, dialect):
+        if value is None:
+            return value
+        elif dialect.name == "postgresql":
+            return str(value)
+        else:
+            return str(value)
+
+    def process_result_value(self, value, dialect):
+        if value is None:
+            return value
+        else:
+            if not isinstance(value, uuid.UUID):
+                try:
+                    return uuid.UUID(str(value))
+                except Exception:
+                    return value
+            return value
 
 connect_args = {"check_same_thread": False} if "sqlite" in config.DATABASE_URL else {}
 engine = create_async_engine(config.DATABASE_URL, echo=False, connect_args=connect_args)
@@ -22,7 +54,7 @@ JSON_TYPE = JSON().with_variant(JSONB(), "postgresql")
 
 class User(Base):
     __tablename__ = "users"
-    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    id = Column(GUID(), primary_key=True, default=uuid.uuid4)
     email = Column(String, nullable=False)
     password_hash = Column(String, nullable=False)
     full_name = Column(String, nullable=True)
